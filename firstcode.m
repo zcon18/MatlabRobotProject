@@ -35,6 +35,8 @@ if (sum(top)+sum(bottom)+sum(left)+sum(right)~=0)|(step_num == 0)
 
     %test to see if I can get git to work
 
+    %second test to see if its easier this time
+
     %{ 
     for i=1:length(optimal_moves)
         
