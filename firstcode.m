@@ -32,6 +32,9 @@ if (sum(top)+sum(bottom)+sum(left)+sum(right)~=0)|(step_num == 0)
         n=randi(4,1);
     end
     command = optimal_moves(n);
+
+    %test to see if I can get git to work
+
     %{ 
     for i=1:length(optimal_moves)
         
