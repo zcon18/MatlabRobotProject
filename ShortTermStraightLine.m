@@ -60,7 +60,7 @@ for i=1:length(optimal_moves)
 end
 %Setting command to be the one we picked
 if(optimal_moves(previousDirectionIndex)==0) %Incase we can't go in a straight line we pick a new direction
-    if isempty(possible_moves) %this makes it so the robot can only back track if we are back into a corner
+    if isempty(possible_moves) %this makes it so the robot can only back track if we are back into a corner, TODO move this in to the anti-backtracking conditional
         possible_moves=[reverse(previousDirection)];
     end
     n=randi(length(possible_moves),1);
