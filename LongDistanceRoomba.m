@@ -11,10 +11,11 @@ if step_num==0
     while i==5 %picks a random direction (can't be 5 because it won't go anywhere)
         i=randi(9,1); 
     end
-    direction=i;
+    direction=9;
 end
 direction=find_permeable(direction, local_view);
 command=direction;
+disp(local_view);
 function output=find_permeable(direction, local_view) %this function uses recursion to figure out if the bot can pass in the direction it's going on to the next step. if it can then it continues in the same direction, if not it picks from the 2 directions adjacent to it on the opposite side
     % FOV Groups
     NE=rmmissing(local_view([1 2],[4 5]));
@@ -22,6 +23,9 @@ function output=find_permeable(direction, local_view) %this function uses recurs
     NW=rmmissing(local_view([1 2],[1 2]));
     W = local_view(3,[1 2]);
     SW=rmmissing(local_view([4 5],[1 2]));
+    disp(SW);
+    disp(" ");
+    disp(local_view);
     S = local_view([4 5],3);
     SE=rmmissing(local_view([4 5],[4 5]));
     E = local_view(3,[4 5]);

@@ -14,16 +14,26 @@ STARTING_POS=[12,12];
 %Mem needs to be called in both branches
 if isfile('memorySpace.mat') %There's a chance the file won't exist so we need to make it just in case
     mem = matfile('memorySpace.mat','Writable',true); % Matfile makes it so we don't have to load a file in each time
+    
+    mem.pos=STARTING_POS;
 else
     disp("memory space file does not exist, creating")
     map=[ones(2,29)*WALL;  ones(19,2)*WALL, ones(19,25)*UNEXPLORED, ones(19,2)*WALL;  ones(2,29)*WALL];
     save("memorySpace.mat",'map');
     mem=matfile('memorySpace.mat','Writable',true);
+
+    mem.pos=STARTING_POS;
 end
+
+pos=mem.pos;
 map=mem.map;
+LV=local_view;
+LV(isnan(LV))=UNEXPLORED;
+
 if step_num==0
     position=STARTING_POS;
-    map([(12-2):(12+2)],[(12-2):(12+2)])=rmmissing(local_view);
+
+    map([(12-2):(12+2)],[(12-2):(12+2)])=LV;
     i=5;
     while i==5 %picks a random direction (can't be 5 because it won't go anywhere)
         i=randi(9,1); 
@@ -31,23 +41,32 @@ if step_num==0
     direction=i;
 end
 
-direction=find_permeable(direction, local_view);
+%finalize
+direction=find_permeable(direction, LV);
+disp(direction);
+pos=deadReckon(pos,direction);
+disp("pos: "+pos);
+map=updateMap(pos,map,LV);
+
+%save
+mem.map=map;
+mem.pos=pos;
 command=direction;
 
 % Functions
 
-function output=find_permeable(direction, local_view) %this function uses recursion to figure out if the bot can pass in the direction it's going on to the next step. if it can then it continues in the same direction, if not it picks from the 2 directions adjacent to it on the opposite side
+function output=find_permeable(direction, LV) %this function uses recursion to figure out if the bot can pass in the direction it's going on to the next step. if it can then it continues in the same direction, if not it picks from the 2 directions adjacent to it on the opposite side
     % FOV Groups
-    NE=rmmissing(local_view([1 2],[4 5]));
-    N =local_view([1 2],3);
-    NW=rmmissing(local_view([1 2],[1 2]));
-    W = local_view(3,[1 2]);
-    SW=rmmissing(local_view([4 5],[1 2]));
-    S = local_view([4 5],3);
-    SE=rmmissing(local_view([4 5],[4 5]));
-    E = local_view(3,[4 5]);
+    NE=LV(2,4);
+    N =LV([1 2],3);
+    NW=LV(2,2);
+    W = LV(3,[1 2]);
+    SW=LV(4,2);
+    S = LV([4 5],3);
+    SE=LV(4,4);
+    E = LV(3,[4 5]);
     groups={SW; S; SE; W; [3 3]; E; NW; N; NE}; %These are the only block groups that the bot will ever look at, the index number of the block corresponds to if you placed a keypad on the 3x3 section around the bot in local view, this means that cell with a given index number will be in the direction number of the next step
-    if sum(sum(groups{direction})) >= 0 %Checks if the block it's heading towards is not a wall
+    if sum(sum(groups{direction},"omitnan")) >= 0 %Checks if the block it's heading towards is not a wall
         output=direction;
     else %If it is a wall then select possible new directions based on the current direction
         switch direction
@@ -72,6 +91,49 @@ function output=find_permeable(direction, local_view) %this function uses recurs
                 bounceDirection=[2,4];
         end
         direction=bounceDirection(randi(length(bounceDirection),1));
-        output=find_permeable(direction, local_view); %then it runs the function again new direction it generated, to check if it can pass through the block in its new direction.
+        output=find_permeable(direction, LV); %then it runs the function again new direction it generated, to check if it can pass through the block in its new direction.
     end
+end
+
+function output=deadReckon(pos,direction)
+    disp("direction: "+direction);
+    disp("pos: " + pos);
+    switch direction
+        case 1
+            pos_new=pos+[-1,-1];
+            disp(pos+[-1,-1]);
+            disp(pos_new);
+        case 2
+            pos_new=pos+[0,-1];
+            disp(pos_new);
+        case 3
+            pos_new=pos+[1,-1];
+            disp(pos+[1,-1]);
+            disp(pos_new);
+        case 4
+            pos_new=pos+[-1,0];
+            disp(pos_new);
+        case 5
+            disp("what?");
+        case 6
+            pos_new=pos+[1,0];
+            disp(pos_new);
+        case 7
+            disp(pos+[-1,1]);
+            pos_new=pos+[-1,1];
+            disp(pos_new);
+        case 8
+            pos_new=pos+[0,1];
+            disp(pos_new);
+        case 9
+            disp(pos+[1,1]);
+            pos_new=pos+[1,1];
+            disp(pos_new);
+    end
+    output=pos_new;
+end
+
+function output=updateMap(pos, map, LV)
+    map([(pos(2)-2):(pos(2)+2)],[(pos(1)-2):(pos(1)+2)])=LV;
+    output=map;
 end
