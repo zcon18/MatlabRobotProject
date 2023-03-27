@@ -6,13 +6,31 @@
 %adjacent directions to the opposite of the current direction. Keep
 %checking until you find a permeable direction.
 
+WALL=-1;
+SPACE=0;
+UNEXPLORED=1;
+STARTING_POS=[12,12];
+
+%Mem needs to be called in both branches
+if isfile('memorySpace.mat') %There's a chance the file won't exist so we need to make it just in case
+    mem = matfile('memorySpace.mat','Writable',true); % Matfile makes it so we don't have to load a file in each time
+else
+    disp("memory space file does not exist, creating")
+    map=[ones(2,29)*WALL;  ones(19,2)*WALL, ones(19,25)*UNEXPLORED, ones(19,2)*WALL;  ones(2,29)*WALL];
+    save("memorySpace.mat",'map');
+    mem=matfile('memorySpace.mat','Writable',true);
+end
+map=mem.map;
 if step_num==0
+    position=STARTING_POS;
+    map([(12-2):(12+2)],[(12-2):(12+2)])=rmmissing(local_view);
     i=5;
     while i==5 %picks a random direction (can't be 5 because it won't go anywhere)
         i=randi(9,1); 
     end
     direction=i;
 end
+
 direction=find_permeable(direction, local_view);
 command=direction;
 function output=find_permeable(direction, local_view) %this function uses recursion to figure out if the bot can pass in the direction it's going on to the next step. if it can then it continues in the same direction, if not it picks from the 2 directions adjacent to it on the opposite side
@@ -26,7 +44,7 @@ function output=find_permeable(direction, local_view) %this function uses recurs
     SE=rmmissing(local_view([4 5],[4 5]));
     E = local_view(3,[4 5]);
     groups={SW; S; SE; W; [3 3]; E; NW; N; NE}; %These are the only block groups that the bot will ever look at, the index number of the block corresponds to if you placed a keypad on the 3x3 section around the bot in local view, this means that cell with a given index number will be in the direction number of the next step
-    if sum(sum(groups{direction})) >= 0 %Checks if the group of blocks it's heading towards is not a wall
+    if sum(sum(groups{direction})) >= 0 %Checks if the block it's heading towards is not a wall
         output=direction;
     else %If it is a wall then select possible new directions based on the current direction
         switch direction
