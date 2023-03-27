@@ -7,15 +7,14 @@
 %checking until you find a permeable direction.
 
 if step_num==0
-    n=5;
-    while n==5 %picks a random direction (can't be 5 because it won't go anywhere)
-        n=randi(9,1); 
+    i=5;
+    while i==5 %picks a random direction (can't be 5 because it won't go anywhere)
+        i=randi(9,1); 
     end
-    direction=n;
+    direction=i;
 end
 direction=find_permeable(direction, local_view);
 command=direction;
-disp(command);
 function output=find_permeable(direction, local_view) %this function uses recursion to figure out if the bot can pass in the direction it's going on to the next step. if it can then it continues in the same direction, if not it picks from the 2 directions adjacent to it on the opposite side
     % FOV Groups
     NE=rmmissing(local_view([1 2],[4 5]));
@@ -23,7 +22,6 @@ function output=find_permeable(direction, local_view) %this function uses recurs
     NW=rmmissing(local_view([1 2],[1 2]));
     W = local_view(3,[1 2]);
     SW=rmmissing(local_view([4 5],[1 2]));
-    disp(SW);
     S = local_view([4 5],3);
     SE=rmmissing(local_view([4 5],[4 5]));
     E = local_view(3,[4 5]);
@@ -33,27 +31,26 @@ function output=find_permeable(direction, local_view) %this function uses recurs
     else %If it is a wall then select possible new directions based on the current direction
         switch direction
             case 1
-                d=[6,8];
+                bounceDirection=[6,8];
             case 2
-                d=[7,9];
+                bounceDirection=[7,9];
             case 3
-                d=[4,8];
+                bounceDirection=[4,8];
             case 4
-                d=[3,9];
+                bounceDirection=[3,9];
             case 5 %just in case a 5 somehow is picked
-                d=[1,2,3,4,6,7,8,9];
+                bounceDirection=[1,2,3,4,6,7,8,9];
                 disp("what?");
             case 6
-                d=[1,7];
+                bounceDirection=[1,7];
             case 7
-                d=[2,6];
+                bounceDirection=[2,6];
             case 8
-                d=[1,3];
+                bounceDirection=[1,3];
             case 9
-                d=[2,4];
+                bounceDirection=[2,4];
         end
-        disp(d);
-        direction=d(randi(length(d),1));
+        direction=bounceDirection(randi(length(bounceDirection),1));
         output=find_permeable(direction, local_view); %then it runs the function again new direction it generated, to check if it can pass through the block in its new direction.
     end
 end
