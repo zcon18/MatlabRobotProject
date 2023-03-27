@@ -15,7 +15,6 @@ if step_num==0
 end
 direction=find_permeable(direction, local_view);
 command=direction;
-disp(command);
 function output=find_permeable(direction, local_view) %this function uses recursion to figure out if the bot can pass in the direction it's going on to the next step. if it can then it continues in the same direction, if not it picks from the 2 directions adjacent to it on the opposite side
     % FOV Groups
     NE=rmmissing(local_view([1 2],[4 5]));
@@ -23,7 +22,6 @@ function output=find_permeable(direction, local_view) %this function uses recurs
     NW=rmmissing(local_view([1 2],[1 2]));
     W = local_view(3,[1 2]);
     SW=rmmissing(local_view([4 5],[1 2]));
-    disp(SW);
     S = local_view([4 5],3);
     SE=rmmissing(local_view([4 5],[4 5]));
     E = local_view(3,[4 5]);
@@ -52,7 +50,6 @@ function output=find_permeable(direction, local_view) %this function uses recurs
             case 9
                 d=[2,4];
         end
-        disp(d);
         direction=d(randi(length(d),1));
         output=find_permeable(direction, local_view); %then it runs the function again new direction it generated, to check if it can pass through the block in its new direction.
     end
