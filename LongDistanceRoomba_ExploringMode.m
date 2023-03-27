@@ -33,6 +33,9 @@ end
 
 direction=find_permeable(direction, local_view);
 command=direction;
+
+% Functions
+
 function output=find_permeable(direction, local_view) %this function uses recursion to figure out if the bot can pass in the direction it's going on to the next step. if it can then it continues in the same direction, if not it picks from the 2 directions adjacent to it on the opposite side
     % FOV Groups
     NE=rmmissing(local_view([1 2],[4 5]));
