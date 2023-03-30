@@ -5,23 +5,21 @@
 %the sum command) mark this as impermeable and check a one of the 2 
 %adjacent directions to the opposite of the current direction. Keep
 %checking until you find a permeable direction.
-
 WALL=-1;
 SPACE=0;
 UNEXPLORED=1;
 STARTING_POS=[12,12];
 
 %Mem needs to be called in both branches
+%TODO: CHECK IF map and pos exsit within an existing memorySpace.mat file
+%or else code will break
 if isfile('memorySpace.mat') %There's a chance the file won't exist so we need to make it just in case
     mem = matfile('memorySpace.mat','Writable',true); % Matfile makes it so we don't have to load a file in each time
-    
-    mem.pos=STARTING_POS;
 else
     disp("memory space file does not exist, creating")
     map=[ones(2,29)*WALL;  ones(19,2)*WALL, ones(19,25)*UNEXPLORED, ones(19,2)*WALL;  ones(2,29)*WALL];
     save("memorySpace.mat",'map');
     mem=matfile('memorySpace.mat','Writable',true);
-
     mem.pos=STARTING_POS;
 end
 
@@ -31,22 +29,25 @@ LV=local_view;
 LV(isnan(LV))=UNEXPLORED;
 
 if step_num==0
-    position=STARTING_POS;
-
+    %set up map and pos on first step
+    map=[ones(2,29)*WALL;  ones(19,2)*WALL, ones(19,25)*UNEXPLORED, ones(19,2)*WALL;  ones(2,29)*WALL];
     map([(12-2):(12+2)],[(12-2):(12+2)])=LV;
+    pos=STARTING_POS;
+
     i=5;
     while i==5 %picks a random direction (can't be 5 because it won't go anywhere)
-        i=randi(9,1); 
+        i=randi(9,1);
     end
     direction=i;
 end
 
 %finalize
 direction=find_permeable(direction, LV);
-disp(direction);
+disp("direction_0: "+direction);
+disp("step_0: "+step_num);
+map=updateMap(pos,map,LV); %update map before you change position TO SEE MAP LOAD IN memorySpace THEN DO image((map(:,:)+1)*128)
 pos=deadReckon(pos,direction);
-disp("pos: "+pos);
-map=updateMap(pos,map,LV);
+
 
 %save
 mem.map=map;
@@ -98,17 +99,16 @@ end
 function output=deadReckon(pos,direction)
     disp("direction: "+direction);
     disp("pos: " + pos);
-    switch direction
+
+    switch direction %even though 9 goes further upwards a greater y vaule correspondes to being lower on the map so 7 to 9 have negative vaules attached
         case 1
-            pos_new=pos+[-1,-1];
-            disp(pos+[-1,-1]);
+            pos_new=pos+[-1,1];
             disp(pos_new);
         case 2
-            pos_new=pos+[0,-1];
+            pos_new=pos+[0,1];
             disp(pos_new);
         case 3
-            pos_new=pos+[1,-1];
-            disp(pos+[1,-1]);
+            pos_new=pos+[1,1];
             disp(pos_new);
         case 4
             pos_new=pos+[-1,0];
@@ -119,21 +119,28 @@ function output=deadReckon(pos,direction)
             pos_new=pos+[1,0];
             disp(pos_new);
         case 7
-            disp(pos+[-1,1]);
-            pos_new=pos+[-1,1];
+            pos_new=pos+[-1,-1];
             disp(pos_new);
         case 8
-            pos_new=pos+[0,1];
+            pos_new=pos+[0,-1];
             disp(pos_new);
         case 9
-            disp(pos+[1,1]);
-            pos_new=pos+[1,1];
+            pos_new=pos+[1,-1];
             disp(pos_new);
     end
     output=pos_new;
 end
 
 function output=updateMap(pos, map, LV)
+    disp(LV);
+    NEcorner=map(pos(2)-2,pos(1)+2); %I know I could use an array instead of a punch of temp varibles but where would be the fun in that
+    NWcorner=map(pos(2)-2,pos(1)-2);
+    SWcorner=map(pos(2)+2,pos(1)-2);
+    SEcorner=map(pos(2)+2,pos(1)+2);
     map([(pos(2)-2):(pos(2)+2)],[(pos(1)-2):(pos(1)+2)])=LV;
+    map(pos(2)-2,pos(1)+2)=NEcorner;
+    map(pos(2)-2,pos(1)-2)=NWcorner;
+    map(pos(2)+2,pos(1)-2)=SWcorner;
+    map(pos(2)+2,pos(1)+2)=SEcorner;
     output=map;
 end
