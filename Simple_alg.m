@@ -35,8 +35,6 @@ end
 
 %finalize
 [direction,state]=find_unexplored(direction, LV,state,map,pos);
-disp("direction_0: "+direction);
-disp("step_0: "+step_num);
 map=updateMap(pos,map,LV); %update map before you change position TO SEE MAP LOAD IN memorySpace THEN DO image((map(:,:)+1)*128)
 pos=deadReckon(pos,direction);
 
@@ -71,9 +69,6 @@ function [output,output_state]=find_unexplored(direction, LV, state, map,pos) %t
         if (scannedBlock==-1)
             output=10-direction;
             output_state=2;
-        elseif(mappedBlock<1)
-            output=direction;
-            output_state=2;
         else
             output=direction;
             output_state=1;
@@ -89,48 +84,55 @@ function [output,output_state]=find_unexplored(direction, LV, state, map,pos) %t
             case 8
                 direction = 6;
         end
-        output=direction;
-        output_state=1;
+        switch direction
+            case 2
+                scannedBlock=LV(5,3);
+                mappedBlock=map(pos(2)+3,pos(1));
+            case 4
+                scannedBlock=LV(3,1);
+                mappedBlock=map(pos(2),pos(1)-3);
+            case 6
+                scannedBlock=LV(3,5);
+                mappedBlock=map(pos(2),pos(1)+3);
+            case 8
+                scannedBlock=LV(1,3);
+                mappedBlock=map(pos(2)-3,pos(1));
+        end
+        if (scannedBlock==-1)
+            state=1;
+            [output,output_state]=find_unexplored(direction, LV, state, map,pos);
+        else
+            output=direction;
+            output_state=1;
+        end
     end
 end
 
 function output=deadReckon(pos,direction)
-    disp("direction: "+direction);
-    disp("pos: " + pos);
-
     switch direction %even though 9 goes further upwards a greater y vaule correspondes to being lower on the map so 7 to 9 have negative vaules attached
         case 1
             pos_new=pos+[-1,1];
-            disp(pos_new);
         case 2
             pos_new=pos+[0,1];
-            disp(pos_new);
         case 3
             pos_new=pos+[1,1];
-            disp(pos_new);
         case 4
             pos_new=pos+[-1,0];
-            disp(pos_new);
         case 5
             disp("what?");
         case 6
             pos_new=pos+[1,0];
-            disp(pos_new);
         case 7
             pos_new=pos+[-1,-1];
-            disp(pos_new);
         case 8
             pos_new=pos+[0,-1];
-            disp(pos_new);
         case 9
             pos_new=pos+[1,-1];
-            disp(pos_new);
     end
     output=pos_new;
 end
 
 function output=updateMap(pos, map, LV)
-    disp(LV);
     LV_new=LV;
     LV_new([1 end], [1 end])=0;
     temp=[map(pos(2)-2,pos(1)-2) 0 0 0 map(pos(2)-2,pos(1)+2); 0 0 0 0 0; 0 0 0 0 0; 0 0 0 0 0; map(pos(2)+2,pos(1)-2) 0 0 0 map(pos(2)+2,pos(1)+2)]; %A greater Y corresponds to a lower height therefore the NE and NW corners have lower Y values than SE and SW, also the Y value goes first in arrays
