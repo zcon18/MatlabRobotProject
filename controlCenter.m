@@ -20,6 +20,47 @@ function newPos=posNextMove(pos,direction,steps)
     newPos=pos+(steps*moves{direction}); %multiple steps in calculation
 end
 
+function output_map=updateOptimalMap(directiom,pos,optimalMap)
+    switch direction
+        case 2
+            kernel=[ 
+                    16     5     5     5     0     0     0     5     5     5    14;
+                    16     5     5     0     0     0     0     0     5     5    14;
+                    16     5     5     5     0     0     0     5     5     5    14;
+                    10    19     5     5     5     5     5     5     5    17    10;
+                    10    10    19     5     5     5     5     5    17    10    10;
+                    10    10    10    18    18    18    18    18    10    10    10;
+            ];
+        case 4
+            kernel=[
+                    10    10    10    14    14    14
+                    10    10    11     5     5     5
+                    10    11     5     5     5     5
+                    12     5     5     5     0     5
+                    12     5     5     0     0     0
+                    12     5     5     0     0     0
+                    12     5     5     0     0     0
+                    12     5     5     5     0     5
+                    10    13     5     5     5     5
+                    10    10    13     5     5     5
+                    10    10    10    16    16    16
+                ]
+
+        case 6
+
+        case 8
+            kernel=[
+                    10    10    10    12    12    12    12    12    10    10    10
+                    10    10    13     5     5     5     5     5    11    10    10
+                    10    13     5     5     5     5     5     5     5    11    10
+                    16     5     5     5     0     0     0     5     5     5    14
+                    16     5     5     0     0     0     0     0     5     5    14
+                    16     5     5     5     0     0     0     5     5     5    14
+            ];
+
+    end
+end
+
 %{
 NE=(5,25)
 NW=(5,5)
