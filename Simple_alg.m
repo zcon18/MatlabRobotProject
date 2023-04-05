@@ -54,19 +54,19 @@ function [output,output_state]=find_unexplored(direction, LV, state, map,pos) %t
         scannedMap=0;
         switch direction
             case 2
-                scannedBlock=LV(5,3);
+                scannedBlock=LV([4 5],3);
                 mappedBlock=map(pos(2)+3,pos(1));
             case 4
-                scannedBlock=LV(3,1);
+                scannedBlock=LV(3,[1 2]);
                 mappedBlock=map(pos(2),pos(1)-3);
             case 6
-                scannedBlock=LV(3,5);
+                scannedBlock=LV(3,[4 5]);
                 mappedBlock=map(pos(2),pos(1)+3);
             case 8
-                scannedBlock=LV(1,3);
+                scannedBlock=LV([1 2],3);
                 mappedBlock=map(pos(2)-3,pos(1));
         end
-        if (scannedBlock==-1)
+        if (sum(scannedBlock)<0)
             output=10-direction;
             output_state=2;
         else
@@ -86,19 +86,19 @@ function [output,output_state]=find_unexplored(direction, LV, state, map,pos) %t
         end
         switch direction
             case 2
-                scannedBlock=LV(5,3);
+                scannedBlock=LV([4 5],3);
                 mappedBlock=map(pos(2)+3,pos(1));
             case 4
-                scannedBlock=LV(3,1);
+                scannedBlock=LV(3,[1 2]);
                 mappedBlock=map(pos(2),pos(1)-3);
             case 6
-                scannedBlock=LV(3,5);
+                scannedBlock=LV(3,[4 5]);
                 mappedBlock=map(pos(2),pos(1)+3);
             case 8
-                scannedBlock=LV(1,3);
+                scannedBlock=LV([1 2],3);
                 mappedBlock=map(pos(2)-3,pos(1));
         end
-        if (scannedBlock==-1)
+        if (sum(scannedBlock)<0)
             state=1;
             [output,output_state]=find_unexplored(direction, LV, state, map,pos);
         else
