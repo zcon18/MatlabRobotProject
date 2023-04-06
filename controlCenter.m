@@ -1,14 +1,32 @@
-optimalScaningBox=zeros(23,29);
-optimalScaningBox(5:end-4,5:end-4)=1; %So theres a way of doing this with a 2d convolution which even has some simularities to the porject that we are doing but I don't wanna look into it rn
-
 sightBox=ones(5,5);
 sightbox([1 5], [1 5])=0;
 
-pos=[12,12];
-newPos=posNextMove(pos,8,8);
-if(optimalScaningBox(newPos(2),newPos(1))==0)
-    disp("Beyond");
+WALL=-1;
+SPACE=0;
+CHARGING_STATION=1;
+UNEXPLORED=2;
+STARTING_POS=[12,12];
+
+optimalScaningBox=zeros(23,29);
+optimalScaningBox(5:end-4,5:end-4)=UNEXPLORED; %So theres a way of doing this with a 2d convolution which even has some simularities to the porject that we are doing but I don't wanna look into it rn
+
+optibox=[5,25;5,19]; %(X,Y)
+
+if (step_num==0)
+    map=[ones(2,29)*WALL;  ones(19,2)*WALL, ones(19,25)*UNEXPLORED, ones(19,2)*WALL;  ones(2,29)*WALL];
+    map([(12-2):(12+2)],[(12-2):(12+2)])=LV;
+    pos=STARTING_POS;
+    slams={ones(1,29)*17,ones(23,1)*5,ones(23,1)*21,ones(1,29)*5};
 end
+
+
+map=updateMap(pos,map,LV); %update map before you change position TO SEE MAP LOAD IN memorySpace THEN DO image((map(:,:)+1)*128)
+slams=updateSlams(pos,LV,slams);
+pos=deadReckon(pos,direction);
+
+
+
+%Functions
 
 function newPos=posNextMove(pos,direction,steps)
 %Change in X,Y based direction number given in keypad position
@@ -71,7 +89,7 @@ switch direction
             16     5     5     0     0     0     0     0     5     5    14;
             ];
 
-end
+    end
 end
 
 function tube=makeTube(direction, steps)
@@ -82,6 +100,114 @@ function tube=makeTube(direction, steps)
     if(direction == 4||6)
         tube=ones(5,steps);
         tube([1 end], [1 end])=0;
+    end
+end
+
+function output=updateSlams(pos,LV,slams) %do this before updating position
+%bottom, left, right, top
+%everything is in the reference frame of LV
+    bottom=slams{1}((pos(1)-2):(pos(1)+2)); %how far down you can go looks for the least y-valued one
+    left=slams{2}((pos(2)-2):(pos(2)+2)); %how far left you can go, looks for the most x-valued one
+    disp(left);
+    right=slams{3}((pos(2)-2):(pos(2)+2)); %how for right you can go, looks for the least x-valued one
+    top=slams{4}((pos(1)-2):(pos(1)+2)); %how far up you can go, looks for the most y-valued one
+    %keep in mind that the top left cor of LV is at
+    %(Y,X):(pos(2)-2,pos(1)-2)
+    LV([1 end], [1 end])=0; %by setting its corners to zero it means we just wont update them
+    walls=(LV==-1)+(LV==1);
+    for i = 1:length(LV) %rows
+        for j = 1:length(LV(i,:)) %collumns
+            if(walls(i,j)==1)
+                y=pos(2)-3+i;
+                x=pos(1)-3+j;
+                if (y<bottom(j))
+                    bottom(j)=y; %get the correct cell, check if its less than the current valued one, if so replace it
+                end
+                if(x>left(i))
+                    left(i)=x;
+                end
+                if (x<right(i))
+                    right(i)=x;
+                end
+                if (y>top(j))
+                    top(j)=y;
+                end
+            end
+        end
+    end
+    disp(left);
+    if(sum(left==0)>0)
+        disp("ZERO FOUND");
+    end
+    slams{1}((pos(1)-2):(pos(1)+2))=bottom;
+    slams{2}((pos(2)-2):(pos(2)+2))=left;
+    slams{3}((pos(2)-2):(pos(2)+2))=right;
+    slams{4}((pos(1)-2):(pos(1)+2))=top;
+    output=slams;
+end
+
+function commands=scanScanSlam(pos,direction,map,optibox,slams) %The way how this function works is it first spreates the pointmap into 3 parts to left/top of the robot, a middle strip, and to the right/bottom of the robot. It then scans the left/up for walls if there are non then it goes up and down/left and right scaning for more walls, then it slams on the 3rd term to the slam value , it then computes the sum if it were to go on that route, the highest sum is the direction the robot goes in
+    walls=(map==-1)+(map==1); %wall, charing_station
+    pointMap=(map==2); %unexplored
+    if(direction==2) %then do left and right
+        %it makes a matrix THE SIZE of top to bottom of the optibox then left until it reaches the
+        %x-value the robot is in
+        LLScoreMatrix=zeros(optibox(2,2)-optibox(2,1),pos(1));%The whole hight of the optibox
+        LRScoreMatrix=zeros(optibox(2,2)-optibox(2,1),pos(1));
+        RRScoreMatrix=zeros(optibox(2,2)-optibox(2,1),optibox(1,2)-pos(1));
+        RLScoreMatrix=zeros(optibox(2,2)-optibox(2,1),optibox(1,2)-pos(1));
+        middleURDScoreMatrix=zeros(optibox(2,2)-optibox(2,1),1);
+        middleULDScoreMatrix=zeros(optibox(2,2)-optibox(2,1),1);
+        runningSum=0;
+
+        %making the left score Matrix
+        LDepth=0; %be a position number 
+        UDepth=0;
+        for i=pos(1):-1:optibox(1,1) %left most side of the optibox
+            if(walls(pos(2),i)==1) %break this intial forward reaching loop if there are any known walls directly infront of the robot
+                LDepth=i; %MAYBE set this as i-1?
+                break;
+            end
+
+            %Starting sum and updating pointMap before it enters the next loop
+            newPM=pointMap; %resets newPM
+            nievePM=newPM([pos(2)-2:pos(2)+2],[i-2:pos(1)+2]); %this will be a long tube full of potiental points for unexplored blocks
+            nievePM([1 end],[1 end])=0; %makes the corners of the tube zero because you can't see them
+            runningSum=sum(sum(nievePM)); %this forces runningSum to be the sum of the tube, it gets reset every time
+            newPM([i-2:newPMpos(2)+2],[pos(1)-2:pos(1)+2])=0; %sets the part of newPM equaled to zero for calculating the next loop, so we don't double count points
+        
+            %run a for loop on depth, then going to slam numbers, checking
+            %right and left, if a search starts after a slam number just set it
+            %as the optibox
+            for j=pos(2):-1:optibox(1,1) %going up to the top of the optibox
+                if(walls(j,i)==1)
+                    UDepth=j;
+                    break
+                end
+                newNewPM=newPM;
+                nievePM2=newNewPM([j-2:pos(2)+2],[i-2:i+2]); %this says that our new scaning postion is i inward therefore the horizontal box of our tube is i-2 to i+2, vertically the box starts at pos(2)+2 cause a greater y is futher doward and it is j tall because it starts at the pos(2) (y-value) and decreases.
+                nievePM2([1 end], [1 end])=0; %The corners can't be counted in our sum
+                runningSum2=sum(sum(nievePM2))
+                newNewPM([j-2:pos(2)+2],[i-2:i+2])=0; %set the section that the tube was equaled to zero to prevent double counting
+                
+                %now we just need to slam it right and left
+                if(i<slams{3}(j)) %in the event the right slam has been made really small just set it back equalled to the slam box
+                    slams{3}(j)=optibox(1,2); %x-value maximum value MAYBE set this to S or something
+                end
+                slamTubeR=newNewPM([j-2:pos(2)+2],[i-2:slams{3}(j)+2]) %from the curent positon all the way back right until you reach the slam value
+                slamTubeR([1 end], [1 end])=0; %don't include corners
+                runningSum3=sum(sum(slamTubeR));
+                LRScoreMatrix(j,i)=runningSum3+runningSum2+runingSum;
+
+                if(i>slams{2}(j))
+                    slams{2}(j)=optibox(1,1) %MAYBE set this equalled to S???
+                end
+                slamTubeL=newNewPM([j-2:pos(2)+2],[slams{2}(j)-2:i+2]);
+                slamTubeL([1 end], [1 end])=0;
+                runningSum3=sum(sum(slamTubeL));
+                LLScoreMatrix(j,i)=runningSum3+runningSum2+runningSum;
+            end
+        end
     end
 end
 

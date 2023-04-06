@@ -155,7 +155,7 @@ function output=updateSlams(pos,LV,slams) %do this before updating position
     %keep in mind that the top left cor of LV is at
     %(Y,X):(pos(2)-2,pos(1)-2)
     LV([1 end], [1 end])=0; %by setting its corners to zero it means we just wont update them
-    walls=(LV==-1);%+(LV==1);
+    walls=(LV==-1)+(LV==1);
     for i = 1:length(LV) %rows
         for j = 1:length(LV(i,:)) %collumns
             if(walls(i,j)==1)
