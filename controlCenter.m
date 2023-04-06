@@ -11,53 +11,77 @@ if(optimalScaningBox(newPos(2),newPos(1))==0)
 end
 
 function newPos=posNextMove(pos,direction,steps)
-    %Change in X,Y based direction number given in keypad position
-    %Greater Y is futher down the screen
-    moves={[-1,1],[0,1],[1,1],[-1,0],[0,0],[1,0],[-1,-1],[0,-1],[1,-1]};
-    if(nargin==2) %incase number of steps isn't specified
-        steps=1;
-    end
-    newPos=pos+(steps*moves{direction}); %multiple steps in calculation
+%Change in X,Y based direction number given in keypad position
+%Greater Y is futher down the screen
+moves={[-1,1],[0,1],[1,1],[-1,0],[0,0],[1,0],[-1,-1],[0,-1],[1,-1]};
+if(nargin==2) %incase number of steps isn't specified
+    steps=1;
+end
+newPos=pos+(steps*moves{direction}); %multiple steps in calculation
 end
 
 function output_map=updateOptimalMap(directiom,pos,optimalMap)
-    switch direction
-        case 2
-            kernel=[ 
-                    16     5     5     5     0     0     0     5     5     5    14;
-                    16     5     5     0     0     0     0     0     5     5    14;
-                    16     5     5     5     0     0     0     5     5     5    14;
-                    10    19     5     5     5     5     5     5     5    17    10;
-                    10    10    19     5     5     5     5     5    17    10    10;
-                    10    10    10    18    18    18    18    18    10    10    10;
+switch direction
+    case 2
+        kernel=[
+            16     5     5     0     0     0     0     0     5     5    14;
+            16     5     5     0     0     0     0     0     5     5    14;
+            16     5     5     5     0     0     0     5     5     5    14;
+            10    19     5     5     5     5     5     5     5    17    10;
+            10    10    19     5     5     5     5     5    17    10    10;
+            10    10    10    18    18    18    18    18    10    10    10;
             ];
-        case 4
-            kernel=[
-                    10    10    10    14    14    14
-                    10    10    11     5     5     5
-                    10    11     5     5     5     5
-                    12     5     5     5     0     5
-                    12     5     5     0     0     0
-                    12     5     5     0     0     0
-                    12     5     5     0     0     0
-                    12     5     5     5     0     5
-                    10    13     5     5     5     5
-                    10    10    13     5     5     5
-                    10    10    10    16    16    16
-                ]
+    case 4
+        kernel=[
+            10    10    10    12    12    12;
+            10    10    13     5     5     5;
+            10    13     5     5     5     5;
+            16     5     5     5     0     0;
+            16     5     5     0     0     0;
+            16     5     5     0     0     0;
+            16     5     5     0     0     0;
+            16     5     5     5     0     0;
+            10    19     5     5     5     5;
+            10    10    19     5     5     5;
+            10    10    10    18    18    16;
+            ]
 
-        case 6
-
-        case 8
-            kernel=[
-                    10    10    10    12    12    12    12    12    10    10    10
-                    10    10    13     5     5     5     5     5    11    10    10
-                    10    13     5     5     5     5     5     5     5    11    10
-                    16     5     5     5     0     0     0     5     5     5    14
-                    16     5     5     0     0     0     0     0     5     5    14
-                    16     5     5     5     0     0     0     5     5     5    14
+    case 6
+        kernel=[
+            12    12    12    10    10    10
+             5     5     5    11    10    10
+             5     5     5     5    11    10
+             0     0     5     5     5    14
+             0     0     0     5     5    14
+             0     0     0     5     5    14
+             0     0     0     5     5    14
+             0     0     5     5     5    14
+             5     5     5     5    17    10
+             5     5     5    17    10    10
+            18    18    18    10    10    10
+            ]
+        
+    case 8
+        kernel=[
+            10    10    10    12    12    12    12    12    10    10    10;
+            10    10    13     5     5     5     5     5    11    10    10;
+            10    13     5     5     5     5     5     5     5    11    10;
+            16     5     5     5     0     0     0     5     5     5    14;
+            16     5     5     0     0     0     0     0     5     5    14;
+            16     5     5     0     0     0     0     0     5     5    14;
             ];
 
+end
+end
+
+function tube=makeTube(direction, steps)
+    if(direction == 8||2)
+        tube=ones(steps,5);
+        tube([1 end], [1 end])=0;
+    end
+    if(direction == 4||6)
+        tube=ones(5,steps);
+        tube([1 end], [1 end])=0;
     end
 end
 

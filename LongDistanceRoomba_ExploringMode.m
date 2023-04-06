@@ -39,6 +39,10 @@ if step_num==0
         i=randi(9,1);
     end
     direction=i;
+
+    %build slams
+    %bottom, left, right, top
+    slams={ones(1,21)*17,ones(17,1)*5,ones(17,1)*21,ones(1,21)*5};
 end
 
 %finalize
@@ -46,6 +50,7 @@ direction=find_permeable(direction, LV);
 disp("direction_0: "+direction);
 disp("step_0: "+step_num);
 map=updateMap(pos,map,LV); %update map before you change position TO SEE MAP LOAD IN memorySpace THEN DO image((map(:,:)+1)*128)
+slams=updateSlams(pos,local_view,slams);
 pos=deadReckon(pos,direction);
 
 
@@ -53,6 +58,10 @@ pos=deadReckon(pos,direction);
 mem.map=map;
 mem.pos=pos;
 command=direction;
+
+if(step_num==step_lim-1)
+    mem.slams=slams;
+end
 
 % Functions
 
@@ -97,36 +106,25 @@ function output=find_permeable(direction, LV) %this function uses recursion to f
 end
 
 function output=deadReckon(pos,direction)
-    disp("direction: "+direction);
-    disp("pos: " + pos);
-
     switch direction %even though 9 goes further upwards a greater y vaule correspondes to being lower on the map so 7 to 9 have negative vaules attached
         case 1
             pos_new=pos+[-1,1];
-            disp(pos_new);
         case 2
             pos_new=pos+[0,1];
-            disp(pos_new);
         case 3
             pos_new=pos+[1,1];
-            disp(pos_new);
         case 4
             pos_new=pos+[-1,0];
-            disp(pos_new);
         case 5
             disp("what?");
         case 6
             pos_new=pos+[1,0];
-            disp(pos_new);
         case 7
             pos_new=pos+[-1,-1];
-            disp(pos_new);
         case 8
             pos_new=pos+[0,-1];
-            disp(pos_new);
         case 9
             pos_new=pos+[1,-1];
-            disp(pos_new);
     end
     output=pos_new;
 end
@@ -138,4 +136,34 @@ function output=updateMap(pos, map, LV)
     temp=[map(pos(2)-2,pos(1)-2) 0 0 0 map(pos(2)-2,pos(1)+2); 0 0 0 0 0; 0 0 0 0 0; 0 0 0 0 0; map(pos(2)+2,pos(1)-2) 0 0 0 map(pos(2)+2,pos(1)+2)]; %A greater Y corresponds to a lower height therefore the NE and NW corners have lower Y values than SE and SW, also the Y value goes first in arrays
     map([(pos(2)-2):(pos(2)+2)],[(pos(1)-2):(pos(1)+2)])=LV_new+temp;
     output=map;
+end
+function output=updateSlams(pos,LV,slams) %do this before updating position
+%bottom, left, right, top
+%everything is in the reference frame of LV
+    bottom=slams{1}((pos(1)-2):(pos(1)+2)); %how far down you can go looks for the least y-valued one
+    left=slams{2}((pos(2)-2):(pos(2)+2)); %how far left you can go, looks for the most x-valued one
+    disp(left);
+    right=slams{3}((pos(2)-2):(pos(2)+2)); %how for right you can go, looks for the least x-valued one
+    top=slams{4}((pos(1)-2):(pos(1)+2)); %how far up you can go, looks for the most y-valued one
+    %keep in mind that the top left cor of LV is at
+    %(Y,X):(pos(2)-2,pos(1)-2)
+    LV([1 end], [1 end])=0; %by setting its corners to zero it means we just wont update them
+    walls=(LV==-1);%+(LV==1);
+    for i = 1:length(LV) %rows
+        for j = 1:length(LV(i,:)) %collumns
+            if(walls(i,j)==1)
+                y=pos(2)-2+i;
+                x=pos(1)-2+j;
+                bottom(j)=y*(y<bottom(j)); %get the correct cell, check if its less than the current valued one, if so replace it
+                left(i)=x*(x>left(i));
+                right(i)=x*(x<right(i));
+                top(j)=y*(y>top(j));
+            end
+        end
+    end
+    slams{1}((pos(1)-2):(pos(1)+2))=bottom;
+    slams{2}((pos(2)-2):(pos(2)+2))=left;
+    slams{3}((pos(2)-2):(pos(2)+2))=right;
+    slams{4}((pos(1)-2):(pos(1)+2))=top;
+    output=slams;
 end
