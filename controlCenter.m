@@ -14,19 +14,58 @@ optibox=[5,25;5,19]; %(X,Y)
 
 if (step_num==0)
     map=[ones(2,29)*WALL;  ones(19,2)*WALL, ones(19,25)*UNEXPLORED, ones(19,2)*WALL;  ones(2,29)*WALL];
+    LV=local_view;
+    LV([1 end], [1 end])=UNEXPLORED;
     map([(12-2):(12+2)],[(12-2):(12+2)])=LV;
     pos=STARTING_POS;
     slams={ones(1,29)*17,ones(23,1)*5,ones(23,1)*21,ones(1,29)*5};
+    direction=2;
 end
 
+LV=local_view;
+LV([1 end], [1 end])=UNEXPLORED;
 
 map=updateMap(pos,map,LV); %update map before you change position TO SEE MAP LOAD IN memorySpace THEN DO image((map(:,:)+1)*128)
 slams=updateSlams(pos,LV,slams);
+scanScanSlam(pos,direction,map,optibox,slams);
 pos=deadReckon(pos,direction);
+command=direction;
 
 
 
 %Functions
+
+function output=updateMap(pos, map, LV)
+    LV_new=LV;
+    LV_new([1 end], [1 end])=0;
+    temp=[map(pos(2)-2,pos(1)-2) 0 0 0 map(pos(2)-2,pos(1)+2); 0 0 0 0 0; 0 0 0 0 0; 0 0 0 0 0; map(pos(2)+2,pos(1)-2) 0 0 0 map(pos(2)+2,pos(1)+2)]; %A greater Y corresponds to a lower height therefore the NE and NW corners have lower Y values than SE and SW, also the Y value goes first in arrays
+    map([(pos(2)-2):(pos(2)+2)],[(pos(1)-2):(pos(1)+2)])=LV_new+temp;
+    output=map;
+end
+
+function output=deadReckon(pos,direction)
+    switch direction %even though 9 goes further upwards a greater y vaule correspondes to being lower on the map so 7 to 9 have negative vaules attached
+        case 1
+            pos_new=pos+[-1,1];
+        case 2
+            pos_new=pos+[0,1];
+        case 3
+            pos_new=pos+[1,1];
+        case 4
+            pos_new=pos+[-1,0];
+        case 5
+            disp("what?");
+        case 6
+            pos_new=pos+[1,0];
+        case 7
+            pos_new=pos+[-1,-1];
+        case 8
+            pos_new=pos+[0,-1];
+        case 9
+            pos_new=pos+[1,-1];
+    end
+    output=pos_new;
+end
 
 function newPos=posNextMove(pos,direction,steps)
 %Change in X,Y based direction number given in keypad position
@@ -108,7 +147,6 @@ function output=updateSlams(pos,LV,slams) %do this before updating position
 %everything is in the reference frame of LV
     bottom=slams{1}((pos(1)-2):(pos(1)+2)); %how far down you can go looks for the least y-valued one
     left=slams{2}((pos(2)-2):(pos(2)+2)); %how far left you can go, looks for the most x-valued one
-    disp(left);
     right=slams{3}((pos(2)-2):(pos(2)+2)); %how for right you can go, looks for the least x-valued one
     top=slams{4}((pos(1)-2):(pos(1)+2)); %how far up you can go, looks for the most y-valued one
     %keep in mind that the top left cor of LV is at
@@ -135,7 +173,6 @@ function output=updateSlams(pos,LV,slams) %do this before updating position
             end
         end
     end
-    disp(left);
     if(sum(left==0)>0)
         disp("ZERO FOUND");
     end
@@ -147,7 +184,7 @@ function output=updateSlams(pos,LV,slams) %do this before updating position
 end
 
 function commands=scanScanSlam(pos,direction,map,optibox,slams) %The way how this function works is it first spreates the pointmap into 3 parts to left/top of the robot, a middle strip, and to the right/bottom of the robot. It then scans the left/up for walls if there are non then it goes up and down/left and right scaning for more walls, then it slams on the 3rd term to the slam value , it then computes the sum if it were to go on that route, the highest sum is the direction the robot goes in
-    walls=(map==-1)+(map==1); %wall, charing_station
+    walls=-1*(map==-1)+-1*(map==1); %wall, charing_station
     pointMap=(map==2); %unexplored
     if(direction==2) %then do left and right
         %it makes a matrix THE SIZE of top to bottom of the optibox then left until it reaches the
@@ -174,7 +211,61 @@ function commands=scanScanSlam(pos,direction,map,optibox,slams) %The way how thi
             nievePM=newPM([pos(2)-2:pos(2)+2],[i-2:pos(1)+2]); %this will be a long tube full of potiental points for unexplored blocks
             nievePM([1 end],[1 end])=0; %makes the corners of the tube zero because you can't see them
             runningSum=sum(sum(nievePM)); %this forces runningSum to be the sum of the tube, it gets reset every time
-            newPM([i-2:newPMpos(2)+2],[pos(1)-2:pos(1)+2])=0; %sets the part of newPM equaled to zero for calculating the next loop, so we don't double count points
+            newPM([i-2:pos(2)+2],[pos(1)-2:pos(1)+2])=0; %sets the part of newPM equaled to zero for calculating the next loop, so we don't double count points
+        
+            %run a for loop on depth, then going to slam numbers, checking
+            %right and left, if a search starts after a slam number just set it
+            %as the optibox
+            for j=pos(2):-1:(optibox(1,1)-1) %going up to the top of the optibox
+                if(walls(j,i)==1)
+                    UDepth=j;
+                    break
+                end
+                newNewPM=newPM;
+                nievePM2=newNewPM([j-2:pos(2)+2],[i-2:i+2]); %this says that our new scaning postion is i inward therefore the horizontal box of our tube is i-2 to i+2, vertically the box starts at pos(2)+2 cause a greater y is futher doward and it is j tall because it starts at the pos(2) (y-value) and decreases.
+                nievePM2([1 end], [1 end])=0; %The corners can't be counted in our sum
+                runningSum2=sum(sum(nievePM2));
+                newNewPM([j-2:pos(2)+2],[i-2:i+2])=0; %set the section that the tube was equaled to zero to prevent double counting
+                
+                %now we just need to slam it right and left
+                if(i<slams{3}(j)) %in the event the right slam has been made really small just set it back equalled to the slam box
+                    slams{3}(j)=optibox(1,2); %x-value maximum value MAYBE set this to S or something
+                end
+                slamTubeR=newNewPM([j-2:pos(2)+2],[i-2:slams{3}(j)+2]); %from the curent positon all the way back right until you reach the slam value
+                slamTubeR([1 end], [1 end])=0; %don't include corners
+                runningSum3=sum(sum(slamTubeR));
+                LRScoreMatrix(j,i)=runningSum3+runningSum2+runningSum;
+
+                if(i>slams{2}(j))
+                    slams{2}(j)=optibox(1,1); %MAYBE set this equalled to S???
+                end
+                slamTubeL=newNewPM([j-2:pos(2)+2],[slams{2}(j)-2:i+2]);
+                if(isempty(slamTubeL))
+                    continue;
+                end
+                disp(size(slamTubeL));
+                slamTubeL([1 end], [1 end])=0;
+                runningSum3=sum(sum(slamTubeL));
+                LLScoreMatrix(j,i)=runningSum3+runningSum2+runningSum;
+            end
+        end
+        %Right side
+        for i=pos(1):optibox(1,2) %left most side of the optibox
+            if(walls(pos(2),i)==1) %break this intial forward reaching loop if there are any known walls directly infront of the robot
+                LDepth=i; %MAYBE set this as i-1?
+                break;
+            end
+
+            %Starting sum and updating pointMap before it enters the next loop
+            newPM=pointMap; %resets newPM
+            nievePM=newPM([pos(2)-2:pos(2)+2],[i-2:pos(1)+2]); %this will be a long tube full of potiental points for unexplored blocks
+            disp(size(nievePM));
+            if(size(nievePM,2)==0)
+                continue;
+            end
+            nievePM([1 end],[1 end])=0; %makes the corners of the tube zero because you can't see them
+            runningSum=sum(sum(nievePM)); %this forces runningSum to be the sum of the tube, it gets reset every time
+            newPM([i-2:pos(2)+2],[pos(1)-2:pos(1)+2])=0; %sets the part of newPM equaled to zero for calculating the next loop, so we don't double count points
         
             %run a for loop on depth, then going to slam numbers, checking
             %right and left, if a search starts after a slam number just set it
@@ -187,27 +278,31 @@ function commands=scanScanSlam(pos,direction,map,optibox,slams) %The way how thi
                 newNewPM=newPM;
                 nievePM2=newNewPM([j-2:pos(2)+2],[i-2:i+2]); %this says that our new scaning postion is i inward therefore the horizontal box of our tube is i-2 to i+2, vertically the box starts at pos(2)+2 cause a greater y is futher doward and it is j tall because it starts at the pos(2) (y-value) and decreases.
                 nievePM2([1 end], [1 end])=0; %The corners can't be counted in our sum
-                runningSum2=sum(sum(nievePM2))
+                runningSum2=sum(sum(nievePM2));
                 newNewPM([j-2:pos(2)+2],[i-2:i+2])=0; %set the section that the tube was equaled to zero to prevent double counting
                 
                 %now we just need to slam it right and left
                 if(i<slams{3}(j)) %in the event the right slam has been made really small just set it back equalled to the slam box
                     slams{3}(j)=optibox(1,2); %x-value maximum value MAYBE set this to S or something
                 end
-                slamTubeR=newNewPM([j-2:pos(2)+2],[i-2:slams{3}(j)+2]) %from the curent positon all the way back right until you reach the slam value
+                slamTubeR=newNewPM([j-2:pos(2)+2],[i-2:slams{3}(j)+2]); %from the curent positon all the way back right until you reach the slam value
                 slamTubeR([1 end], [1 end])=0; %don't include corners
                 runningSum3=sum(sum(slamTubeR));
-                LRScoreMatrix(j,i)=runningSum3+runningSum2+runingSum;
+                RRScoreMatrix(j,i)=runningSum3+runningSum2+runningSum;
 
                 if(i>slams{2}(j))
-                    slams{2}(j)=optibox(1,1) %MAYBE set this equalled to S???
+                    slams{2}(j)=optibox(1,1); %MAYBE set this equalled to S???
                 end
                 slamTubeL=newNewPM([j-2:pos(2)+2],[slams{2}(j)-2:i+2]);
                 slamTubeL([1 end], [1 end])=0;
                 runningSum3=sum(sum(slamTubeL));
-                LLScoreMatrix(j,i)=runningSum3+runningSum2+runningSum;
+                RLScoreMatrix(j,i)=runningSum3+runningSum2+runningSum;
             end
         end
+        disp(flip(LLScoreMatrix,2));
+        disp(flip(LRScoreMatrix,2));
+        disp(RRScoreMatrix);
+        disp(RLScoreMatrix);
     end
 end
 
