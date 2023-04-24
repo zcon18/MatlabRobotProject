@@ -2,7 +2,7 @@
 % clear
 %%% Generating a MAP
 %1 represent an object that the path cannot penetrate, zero is a free path
-yee=2;
+yee=1;
 if yee==1
 MAP=int8(zeros(128,140));
 MAP(1:64,1)=1;
@@ -39,7 +39,6 @@ MAP(10:20,80:128)=1;
 MAP(20:40,80:90)=1;
 MAP(1:40,90:90)=1;
 MAP(100:105,70:80)=1;
-disp(MAP);
 MAP_OUT=MAP;
 pause();
 StartX=15;
@@ -55,6 +54,7 @@ end
 %a cell with the value 1 represent a goal cell
 if yee==1
 GoalRegister=int8(zeros(128,140));
+GoalRegister(60,60)=1;
 GoalRegister(110,80)=1;
 else
     GoalRegister=int8(zeros(23,29));
@@ -67,7 +67,7 @@ end
 %Connecting_Distance=3-> Path can be alligned along 32 different direction.
 %Connecting_Distance=4-> Path can be alligned along 56 different direction.
 %ETC......
-Connecting_Distance=1; %Avoid to high values Connecting_Distances for reasonable runtimes. 
+Connecting_Distance=8; %Avoid to high values Connecting_Distances for reasonable runtimes. 
 % Running PathFinder
 OptimalPath=ASTARPATH(StartX,StartY,MAP,GoalRegister,Connecting_Distance)
 % End. 
