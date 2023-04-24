@@ -216,7 +216,6 @@ mem.map=map;
 mem.pos1=pos1;
 mem.pos2=pos2;
 disp([direction1,direction2]);
-pause();
 command=[direction1,direction2];
 
 mem.slams=slams;
