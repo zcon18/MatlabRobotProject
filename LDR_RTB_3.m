@@ -8,7 +8,17 @@
 WALL=-1;
 SPACE=0;
 UNEXPLORED=2;
-STARTING_POS=[12,12]; 
+ROBOT=5;
+STARTING_POS_1=[12,12]; 
+STARTING_POS_2=[13,13]; 
+
+%Grabs corresponding row of the local_view varible and turns it into 2 5x5
+LV1=reshape(local_view(1,:,:),5,5);
+LV1=LV1.*(LV1~=5)+(LV1==5)*-1;
+LV2=reshape(local_view(2,:,:),5,5);
+LV2=LV2.*(LV2~=5)+(LV2==5)*-1;
+moveArray={[-1,1],[0,1],[1,1],[-1,0],[0,0],[1,0],[-1,-1],[0,-1],[1,-1]};
+
 
 %Mem needs to be called in both branches
 %TODO: CHECK IF map and pos exsit within an existing memorySpace.mat file
@@ -20,56 +30,62 @@ else
     map=[ones(2,29)*WALL;  ones(19,2)*WALL, ones(19,25)*UNEXPLORED, ones(19,2)*WALL;  ones(2,29)*WALL];
     save("memorySpace.mat",'map');
     mem=matfile('memorySpace.mat','Writable',true);
-    mem.pos=STARTING_POS;
+    mem.pos1=STARTING_POS_1;
+    mem.pos2=STARTING_POS_2;
 end
 
-pos=mem.pos;
+pos1=mem.pos1;
+pos2=mem.pos2;
 map=mem.map;
-LV=local_view;
-LV([1 end], [1 end])=UNEXPLORED;
+LV1(isnan(LV1))=UNEXPLORED;
 
 if step_num==0
     %set up map and pos on first step
     map=[ones(2,29)*WALL;  ones(19,2)*WALL, ones(19,25)*UNEXPLORED, ones(19,2)*WALL;  ones(2,29)*WALL];
-    map([(12-2):(12+2)],[(12-2):(12+2)])=LV;
-    pos=STARTING_POS;
+    map([(STARTING_POS_1(2)-2):(STARTING_POS_1(2)+2)],[(STARTING_POS_1(1)-2):(STARTING_POS_1(1)+2)])=LV1;
+    map([(STARTING_POS_2(2)-2):(STARTING_POS_2(2)+2)],[(STARTING_POS_2(1)-2):(STARTING_POS_2(1)+2)])=LV2;
+    pos1=STARTING_POS_1;
+    pos2=STARTING_POS_2;
 
     i=5;
     while i==5 %picks a random direction (can't be 5 because it won't go anywhere)
         i=randi(9,1);
     end
-    direction=8;
+    direction1=i;
+    direction2=10-direction1;
 
     %build slams
     %bottom, left, right, top
     slams={ones(1,29)*17,ones(25,1)*5,ones(25,1)*21,ones(1,29)*5};
 
-    %HEATMAP:
-    %
-    %All positive numbers:gradient to a charger
-    %Walls: -1
-    %Unexplored: -2
-%     heatmap=[ones(2,29)*WALL;  ones(19,2)*WALL, ones(19,25)*-2, ones(19,2)*WALL;  ones(2,29)*WALL];
-    
-
-
-    %We set up the goal register which is just saying our goal is to get back
-    %to the start
-    GoalRegister=int8(zeros(23,29));
-
-    %Find other goals
-    
-    startingChargerPos=[mod(find(LV==1),length(LV)),ceil(find(LV==1)/length(LV))];
-    startingChargerPos=startingChargerPos+[12-2,12-2];
-    GoalRegister(startingChargerPos(1)-1,startingChargerPos(2))=1;
-    GoalRegister(startingChargerPos(1)+1,startingChargerPos(2))=1;
-    GoalRegister(startingChargerPos(1),startingChargerPos(2)-1)=1;
-    GoalRegister(startingChargerPos(1),startingChargerPos(2)+1)=1;
+    mapPointBlocks=zeros(23,29);
 end
 
 %finalize
-direction=find_permeable(direction, LV);
 
+%Start of path 1
+direction1=find_permeable(direction1, LV1);
+
+if(sum(sum(mapPointBlocks))>0)&&(mapPointBlocks(pos1(2),pos1(1))~=1)
+        disp(mapPointBlocks);
+        disp(map);
+        scanZone=int8((map~=0).*(map~=10));
+        GoalRegister=int8(zeros(23,29));
+        GoalRegister=GoalRegister+int8(mapPointBlocks);
+        Connecting_Distance=1;
+        OptimalPath=[];
+        OptimalPath=ASTARPATH(pos1(1),pos1(2),scanZone,GoalRegister,Connecting_Distance);
+        disp(ASTARPATH(pos1(1),pos1(2),scanZone,GoalRegister,Connecting_Distance));
+        disp("OP: "+OptimalPath);
+        local_view_of_PBs=(LV1==10);
+        if(OptimalPath~=inf)
+            directionMatrix=[7 8 9; 4 5 6; 1 2 3];
+            OptimalPath2=rot90(OptimalPath,2);
+            delta=[OptimalPath2(2,1)-OptimalPath2(1,1),OptimalPath2(2,2)-OptimalPath2(1,2)];
+            decodeToDirection=delta+[2,2];
+            direction1=directionMatrix(decodeToDirection(2),decodeToDirection(1));
+        end
+end
 %Return to base will be determined by running the A* Algorthim on every
 %step until length of the path is equaled to the steps remaining minus 1
 %In this version of the algorthim path through blocks are zeros and
@@ -77,41 +93,131 @@ direction=find_permeable(direction, LV);
 %The input matrixies must have int 8 entries for proformance reasons
 scanZone=int8(map~=0); %every where inside the region we scanned will be either a 1 if its a wall/charger or a zero if its empty, and everywhere outside the reason we scanned is a 1. This to make sure the path doesn't take us through walls.
 
+%We set up the goal register which is just saying our goal is to get back
+%to the start
+GoalRegister=int8(zeros(23,29));
+GoalRegister(12,12)=1; % 12,12 is the starting postion
+
+
 %Connecting Distance just determines how far of a jump we can make on each
 %step which is always a 1, which connects us to 8 adjcent cells
 Connecting_Distance=1;
 
 %Calling ASTARPATH to generate the OptimalPath
 OptimalPath=[];
-if(step_num>0)&&~(GoalRegister(pos(2),pos(1)))
-OptimalPath=ASTARPATH(pos(1),pos(2),scanZone,GoalRegister,Connecting_Distance);
+if(step_num>0)&&sum(pos1==[12,12])~=2
+OptimalPath=ASTARPATH(pos1(1),pos1(2),scanZone,GoalRegister,Connecting_Distance);
 end
 %OptimalPath is gives you all the coordinates from start to goal in reverse order
 %Therefore when returning to base we can take the 2nd to last minus the
 %last one to get the delta x and delta y of the next step we need to make
 %inorder to get back to the charger on the very last move.
-disp(length(OptimalPath)+1>100-step_num);
-if(length(OptimalPath)>100-step_num)
+
+if(length(OptimalPath)>19-step_num)
     directionMatrix=[7 8 9; 4 5 6; 1 2 3];
     OptimalPath2=rot90(OptimalPath,2);
     delta=[OptimalPath2(2,1)-OptimalPath2(1,1),OptimalPath2(2,2)-OptimalPath2(1,2)];
     decodeToDirection=delta+[2,2];
-    direction=directionMatrix(decodeToDirection(2),decodeToDirection(1));
+    direction1=directionMatrix(decodeToDirection(2),decodeToDirection(1));
 end
-
-if(step_num>=95)&&GoalRegister(pos(2),pos(1))
-    direction=5;
+if(step_num>18)&&sum(pos1==[12,12])==2
+    direction1=5;
 end
-map=updateMap(pos,map,LV); %update map before you change position TO SEE MAP LOAD IN memorySpace THEN DO image((map(:,:)+1)*128)
+%END of path 1
+LV2_N=LV2;
+LV2_NW=[pos2(2)-2,pos2(1)-2]; %Northwest corner of LV2
+mappedNewPos1=pos1+moveArray{direction1}-LV2_NW+[1,1]; %the new position bot 1 on LV2
+if(sum(mappedNewPos1<=[5,5])==2)&&(sum(mappedNewPos1>=[1,1])==2) %checks if the new position is actually on LV2
+    LV2_N(mappedNewPos1(2),mappedNewPos1(1))=-1; %sets the new position of LV2 to five to treat this as a wall block
+end
+newPos1=pos1+moveArray{direction1};
 
-slams=updateSlams(pos,local_view,slams);
-pos=deadReckon(pos,direction);
+%Start of path 2
+direction2=find_permeable(direction2, LV2_N);
+
+% if(sum(sum(mapPointBlocks))>0)&&(mapPointBlocks(pos2(2),pos2(1))~=1)
+%         disp(mapPointBlocks);
+%         disp(map);
+%         scanZone=int8((map~=0).*(map~=10));
+%         scanZone=int
+%         GoalRegister=int8(zeros(23,29));
+%         GoalRegister=GoalRegister+int8(mapPointBlocks);
+%         Connecting_Distance=1;
+%         OptimalPath=[];
+%         OptimalPath=ASTARPATH(pos2(1),pos2(2),scanZone,GoalRegister,Connecting_Distance);
+%         disp(ASTARPATH(pos2(1),pos2(2),scanZone,GoalRegister,Connecting_Distance));
+%         disp("OP: "+OptimalPath);
+%         local_view_of_PBs=(local_view==10);
+%         if(OptimalPath~=inf)
+%             directionMatrix=[7 8 9; 4 5 6; 1 2 3];
+%             OptimalPath2=rot90(OptimalPath,2);
+%             delta=[OptimalPath2(2,1)-OptimalPath2(1,1),OptimalPath2(2,2)-OptimalPath2(1,2)];
+%             decodeToDirection=delta+[2,2];
+%             direction2=directionMatrix(decodeToDirection(2),decodeToDirection(1));
+%         end
+% end
+%Return to base will be determined by running the A* Algorthim on every
+%step until length of the path is equaled to the steps remaining minus 1
+%In this version of the algorthim path through blocks are zeros and
+%non-pass through blocks are ones.
+%The input matrixies must have int 8 entries for proformance reasons
+scanZone=int8(map~=0); %every where inside the region we scanned will be either a 1 if its a wall/charger or a zero if its empty, and everywhere outside the reason we scanned is a 1. This to make sure the path doesn't take us through walls.
+scanZone(12,12)=1;
+scanZone(newPos1(2),newPos1(1))=1;
+%We set up the goal register which is just saying our goal is to get back
+%to the start
+GoalRegister=int8(zeros(23,29));
+GoalRegister(STARTING_POS_2,STARTING_POS_2)=1; % 13,13 is the starting postion
+
+
+%Connecting Distance just determines how far of a jump we can make on each
+%step which is always a 1, which connects us to 8 adjcent cells
+Connecting_Distance=1;
+
+%Calling ASTARPATH to generate the OptimalPath
+OptimalPath=[];
+if(step_num>0)&&sum(pos2==[13,13])~=2
+OptimalPath=ASTARPATH(pos2(1),pos2(2),scanZone,GoalRegister,Connecting_Distance);
+end
+%OptimalPath is gives you all the coordinates from start to goal in reverse order
+%Therefore when returning to base we can take the 2nd to last minus the
+%last one to get the delta x and delta y of the next step we need to make
+%inorder to get back to the charger on the very last move.
+
+if(length(OptimalPath)>19-step_num)
+    directionMatrix=[7 8 9; 4 5 6; 1 2 3];
+    OptimalPath2=rot90(OptimalPath,2);
+    delta=[OptimalPath2(2,1)-OptimalPath2(1,1),OptimalPath2(2,2)-OptimalPath2(1,2)];
+    decodeToDirection=delta+[2,2];
+    direction2=directionMatrix(decodeToDirection(2),decodeToDirection(1));
+end
+if(step_num>18)&&sum(pos2==[13,13])==2
+    direction2=5;
+end
+%END of path 2
+
+map=updateMap(pos1,map,LV1); %update map before you change position TO SEE MAP LOAD IN memorySpace THEN DO image((map(:,:)+1)*128)
+map=updateMap(pos2,map,LV2);
+%updating the map with all the points in it
+%local_view but just the point blocks
+local_view_of_PBs= (LV1==10);
+%saving
+mapPointBlocks([pos1(2)-2],[pos1(1)-1:pos1(1)+1])=local_view_of_PBs(1,[2:4]); %top
+mapPointBlocks([pos1(2)-1:pos1(2)+1],[pos1(1)-2:pos1(1)+2])=local_view_of_PBs([2:4],[1:5]); %mid
+mapPointBlocks([pos1(2)+2],[pos1(1)-1:pos1(1)+1])=local_view_of_PBs(5,[2:4]);
+
+slams=updateSlams(pos1,LV1,slams);
+pos1=deadReckon(pos1,direction1);
+pos2=deadReckon(pos2,direction2);
 
 
 %save
 mem.map=map;
-mem.pos=pos;
-command=direction;
+mem.pos1=pos1;
+mem.pos2=pos2;
+disp([direction1,direction2]);
+pause();
+command=[direction1,direction2];
 
 mem.slams=slams;
 
@@ -190,9 +296,6 @@ function output=updateMap(pos, map, LV)
     temp=[map(pos(2)-2,pos(1)-2) 0 0 0 map(pos(2)-2,pos(1)+2); 0 0 0 0 0; 0 0 0 0 0; 0 0 0 0 0; map(pos(2)+2,pos(1)-2) 0 0 0 map(pos(2)+2,pos(1)+2)]; %A greater Y corresponds to a lower height therefore the NE and NW corners have lower Y values than SE and SW, also the Y value goes first in arrays
     map([(pos(2)-2):(pos(2)+2)],[(pos(1)-2):(pos(1)+2)])=LV_new+temp;
     output=map;
-end
-
-function updateGoalRegister()
 end
 
 function output=updateSlams(pos,LV,slams) %do this before updating position
