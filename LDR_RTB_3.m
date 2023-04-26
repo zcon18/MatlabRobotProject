@@ -14,9 +14,9 @@ STARTING_POS_2=[13,13];
 
 %Grabs corresponding row of the local_view varible and turns it into 2 5x5
 LV1=reshape(local_view(1,:,:),5,5);
-LV1=LV1.*(LV1~=5)+(LV1==5)*-1;
+LV1=LV1.*(LV1~=5)+(LV1==5)*WALL;
 LV2=reshape(local_view(2,:,:),5,5);
-LV2=LV2.*(LV2~=5)+(LV2==5)*-1;
+LV2=LV2.*(LV2~=5)+(LV2==5)*WALL;
 moveArray={[-1,1],[0,1],[1,1],[-1,0],[0,0],[1,0],[-1,-1],[0,-1],[1,-1]};
 
 
@@ -58,7 +58,8 @@ if step_num==0
     %bottom, left, right, top
     slams={ones(1,29)*17,ones(25,1)*5,ones(25,1)*21,ones(1,29)*5};
 
-    mapPointBlocks=zeros(23,29);
+    mapPointBlocks1=zeros(23,29);
+    mapPointBlocks2=zeros(23,29);
 end
 
 %finalize
@@ -66,132 +67,55 @@ end
 %Start of path 1
 direction1=find_permeable(direction1, LV1);
 
-if(sum(sum(mapPointBlocks))>0)&&(mapPointBlocks(pos1(2),pos1(1))~=1)
-        disp(mapPointBlocks);
-        disp(map);
-        scanZone=int8((map~=0).*(map~=10));
-        GoalRegister=int8(zeros(23,29));
-        GoalRegister=GoalRegister+int8(mapPointBlocks);
-        Connecting_Distance=1;
-        OptimalPath=[];
-        OptimalPath=ASTARPATH(pos1(1),pos1(2),scanZone,GoalRegister,Connecting_Distance);
-        disp(ASTARPATH(pos1(1),pos1(2),scanZone,GoalRegister,Connecting_Distance));
-        disp("OP: "+OptimalPath);
-        local_view_of_PBs=(LV1==10);
-        if(OptimalPath~=inf)
-            directionMatrix=[7 8 9; 4 5 6; 1 2 3];
-            OptimalPath2=rot90(OptimalPath,2);
-            delta=[OptimalPath2(2,1)-OptimalPath2(1,1),OptimalPath2(2,2)-OptimalPath2(1,2)];
-            decodeToDirection=delta+[2,2];
-            direction1=directionMatrix(decodeToDirection(2),decodeToDirection(1));
-        end
+if(sum(sum(mapPointBlocks1))>0)&&(mapPointBlocks1(pos1(2),pos1(1))~=1)
+    direction1=goToGreen(direction1,map,LV1,mapPointBlocks1,pos2);
 end
-%Return to base will be determined by running the A* Algorthim on every
-%step until length of the path is equaled to the steps remaining minus 1
-%In this version of the algorthim path through blocks are zeros and
-%non-pass through blocks are ones.
-%The input matrixies must have int 8 entries for proformance reasons
-scanZone=int8(map~=0); %every where inside the region we scanned will be either a 1 if its a wall/charger or a zero if its empty, and everywhere outside the reason we scanned is a 1. This to make sure the path doesn't take us through walls.
 
-%We set up the goal register which is just saying our goal is to get back
-%to the start
-GoalRegister=int8(zeros(23,29));
-GoalRegister(12,12)=1; % 12,12 is the starting postion
-
-
-%Connecting Distance just determines how far of a jump we can make on each
-%step which is always a 1, which connects us to 8 adjcent cells
-Connecting_Distance=1;
-
-%Calling ASTARPATH to generate the OptimalPath
-OptimalPath=[];
-if(step_num>0)&&sum(pos1==[12,12])~=2
-OptimalPath=ASTARPATH(pos1(1),pos1(2),scanZone,GoalRegister,Connecting_Distance);
+if(step_num>0)&&(chargingStations1(pos1(2),pos1(1))~=1)
+    alteredMap=map+chargingStations2*-1;
+    direction1=returnToBase(pos1,direction1,alteredMap,LV1, chargingStations1,step_num,step_lim);
 end
-%OptimalPath is gives you all the coordinates from start to goal in reverse order
-%Therefore when returning to base we can take the 2nd to last minus the
-%last one to get the delta x and delta y of the next step we need to make
-%inorder to get back to the charger on the very last move.
 
-if(length(OptimalPath)>19-step_num)
-    directionMatrix=[7 8 9; 4 5 6; 1 2 3];
-    OptimalPath2=rot90(OptimalPath,2);
-    delta=[OptimalPath2(2,1)-OptimalPath2(1,1),OptimalPath2(2,2)-OptimalPath2(1,2)];
-    decodeToDirection=delta+[2,2];
-    direction1=directionMatrix(decodeToDirection(2),decodeToDirection(1));
-end
-if(step_num>18)&&sum(pos1==[12,12])==2
+if(step_num>step_lim-3)&&(chargingStations1(pos1(2),pos1(1))==1)
     direction1=5;
 end
+if(isequal(pos1+moveArray{direction1},pos2))
+    direction1=5;
+    disp("boink");
+end
 %END of path 1
+
+
 LV2_N=LV2;
 LV2_NW=[pos2(2)-2,pos2(1)-2]; %Northwest corner of LV2
+mappedPos1=pos1-LV2_NW+[1,1];
+if(sum(mappedPos1<=[5,5])==2)&&(sum(mappedPos1>=[1,1])==2) %checks if the position is actually on LV2
+    LV2_N(mappedPos1(2),mappedPos1(1))=-1; %sets the position of LV2 to five to treat this as a wall block
+end
 mappedNewPos1=pos1+moveArray{direction1}-LV2_NW+[1,1]; %the new position bot 1 on LV2
 if(sum(mappedNewPos1<=[5,5])==2)&&(sum(mappedNewPos1>=[1,1])==2) %checks if the new position is actually on LV2
     LV2_N(mappedNewPos1(2),mappedNewPos1(1))=-1; %sets the new position of LV2 to five to treat this as a wall block
 end
 newPos1=pos1+moveArray{direction1};
 
+
 %Start of path 2
 direction2=find_permeable(direction2, LV2_N);
 
-% if(sum(sum(mapPointBlocks))>0)&&(mapPointBlocks(pos2(2),pos2(1))~=1)
-%         disp(mapPointBlocks);
-%         disp(map);
-%         scanZone=int8((map~=0).*(map~=10));
-%         scanZone=int
-%         GoalRegister=int8(zeros(23,29));
-%         GoalRegister=GoalRegister+int8(mapPointBlocks);
-%         Connecting_Distance=1;
-%         OptimalPath=[];
-%         OptimalPath=ASTARPATH(pos2(1),pos2(2),scanZone,GoalRegister,Connecting_Distance);
-%         disp(ASTARPATH(pos2(1),pos2(2),scanZone,GoalRegister,Connecting_Distance));
-%         disp("OP: "+OptimalPath);
-%         local_view_of_PBs=(local_view==10);
-%         if(OptimalPath~=inf)
-%             directionMatrix=[7 8 9; 4 5 6; 1 2 3];
-%             OptimalPath2=rot90(OptimalPath,2);
-%             delta=[OptimalPath2(2,1)-OptimalPath2(1,1),OptimalPath2(2,2)-OptimalPath2(1,2)];
-%             decodeToDirection=delta+[2,2];
-%             direction2=directionMatrix(decodeToDirection(2),decodeToDirection(1));
-%         end
-% end
-%Return to base will be determined by running the A* Algorthim on every
-%step until length of the path is equaled to the steps remaining minus 1
-%In this version of the algorthim path through blocks are zeros and
-%non-pass through blocks are ones.
-%The input matrixies must have int 8 entries for proformance reasons
-scanZone=int8(map~=0); %every where inside the region we scanned will be either a 1 if its a wall/charger or a zero if its empty, and everywhere outside the reason we scanned is a 1. This to make sure the path doesn't take us through walls.
-scanZone(12,12)=1;
-scanZone(newPos1(2),newPos1(1))=1;
-%We set up the goal register which is just saying our goal is to get back
-%to the start
-GoalRegister=int8(zeros(23,29));
-GoalRegister(STARTING_POS_2,STARTING_POS_2)=1; % 13,13 is the starting postion
-
-
-%Connecting Distance just determines how far of a jump we can make on each
-%step which is always a 1, which connects us to 8 adjcent cells
-Connecting_Distance=1;
-
-%Calling ASTARPATH to generate the OptimalPath
-OptimalPath=[];
-if(step_num>0)&&sum(pos2==[13,13])~=2
-OptimalPath=ASTARPATH(pos2(1),pos2(2),scanZone,GoalRegister,Connecting_Distance);
+%change direction2 to green
+if(sum(sum(mapPointBlocks2))>0)&&(mapPointBlocks2(pos2(2),pos2(1))~=1)
+    direction2=goToGreen(direction2,map,LV2,mapPointBlocks2,newPos1);
 end
-%OptimalPath is gives you all the coordinates from start to goal in reverse order
-%Therefore when returning to base we can take the 2nd to last minus the
-%last one to get the delta x and delta y of the next step we need to make
-%inorder to get back to the charger on the very last move.
 
-if(length(OptimalPath)>19-step_num)
-    directionMatrix=[7 8 9; 4 5 6; 1 2 3];
-    OptimalPath2=rot90(OptimalPath,2);
-    delta=[OptimalPath2(2,1)-OptimalPath2(1,1),OptimalPath2(2,2)-OptimalPath2(1,2)];
-    decodeToDirection=delta+[2,2];
-    direction2=directionMatrix(decodeToDirection(2),decodeToDirection(1));
+if(step_num>0)&&(chargingStations1(pos1(2),pos1(1))~=1)
+    alteredMap=map+chargingStations1*-1;
+    direction2=returnToBase(pos2,direction2,alteredMap,LV2, chargingStations2,step_num,step_lim);
 end
-if(step_num>18)&&sum(pos2==[13,13])==2
+
+if(step_num>step_lim-3)&&sum(pos2==[13,13])==2
+    direction2=5;
+end
+if(isequal(pos2+moveArray{direction2},newPos1)||isequal(pos2+moveArray{direction2},pos1))
     direction2=5;
 end
 %END of path 2
@@ -199,12 +123,19 @@ end
 map=updateMap(pos1,map,LV1); %update map before you change position TO SEE MAP LOAD IN memorySpace THEN DO image((map(:,:)+1)*128)
 map=updateMap(pos2,map,LV2);
 %updating the map with all the points in it
-%local_view but just the point blocks
-local_view_of_PBs= (LV1==10);
+%local_view_1 but just the point blocks
+local_view_of_PBs1= (LV1==10);
 %saving
-mapPointBlocks([pos1(2)-2],[pos1(1)-1:pos1(1)+1])=local_view_of_PBs(1,[2:4]); %top
-mapPointBlocks([pos1(2)-1:pos1(2)+1],[pos1(1)-2:pos1(1)+2])=local_view_of_PBs([2:4],[1:5]); %mid
-mapPointBlocks([pos1(2)+2],[pos1(1)-1:pos1(1)+1])=local_view_of_PBs(5,[2:4]);
+mapPointBlocks1([pos1(2)-2],[pos1(1)-1:pos1(1)+1])=local_view_of_PBs1(1,[2:4]); %top
+mapPointBlocks1([pos1(2)-1:pos1(2)+1],[pos1(1)-2:pos1(1)+2])=local_view_of_PBs1([2:4],[1:5]); %mid
+mapPointBlocks1([pos1(2)+2],[pos1(1)-1:pos1(1)+1])=local_view_of_PBs1(5,[2:4]);
+
+%local_view_2 but with just the point blocks
+local_view_of_PBs2= (LV2==10);
+%saving
+mapPointBlocks2([pos2(2)-2],[pos2(1)-1:pos2(1)+1])=local_view_of_PBs2(1,[2:4]); %top
+mapPointBlocks2([pos2(2)-1:pos2(2)+1],[pos2(1)-2:pos2(1)+2])=local_view_of_PBs2([2:4],[1:5]); %mid
+mapPointBlocks2([pos2(2)+2],[pos2(1)-1:pos2(1)+1])=local_view_of_PBs2(5,[2:4]);
 
 slams=updateSlams(pos1,LV1,slams);
 pos1=deadReckon(pos1,direction1);
@@ -262,6 +193,65 @@ function output=find_permeable(direction, LV) %this function uses recursion to f
         direction=bounceDirection(randi(length(bounceDirection),1));
         output=find_permeable(direction, LV); %then it runs the function again new direction it generated, to check if it can pass through the block in its new direction.
     end
+end
+
+function direction=goToGreen(currentDirection,map,LV,mapPointBlocks,avoidPos)
+    scanZone=int8((map~=0).*(map~=10));
+    scanZone(avoidPos(2),avoidPos(1))=1;
+    GoalRegister=int8(zeros(23,29));
+    GoalRegister=GoalRegister+int8(mapPointBlocks);
+    Connecting_Distance=1;
+    OptimalPath=[];
+    OptimalPath=ASTARPATH(pos1(1),pos1(2),scanZone,GoalRegister,Connecting_Distance);
+    local_view_of_PBs1=(LV==10);
+    if(sum(sum(OptimalPath~=inf))>0)
+        directionMatrix=[7 8 9; 4 5 6; 1 2 3];
+        OptimalPath2=rot90(OptimalPath,2);
+        delta=[OptimalPath2(2,1)-OptimalPath2(1,1),OptimalPath2(2,2)-OptimalPath2(1,2)];
+        decodeToDirection=delta+[2,2];
+        direction=directionMatrix(decodeToDirection(2),decodeToDirection(1));
+    else
+        direction=currentDirection;
+    end
+end
+
+function direction=returnToBase(pos,currentDirection,map,LV, chargingStations,step_num,step_lim) %cant call when on step zero or on back on starting block %if we are at the charging postion near the end don't move
+%Return to base will be determined by running the A* Algorthim on every
+%step until length of the path is equaled to the steps remaining minus 1
+%In this version of the algorthim path through blocks are zeros and
+%non-pass through blocks are ones.
+%The input matrixies must have int 8 entries for proformance reasons
+scanZone=int8((map~=0).*(map~=10)); %every where inside the region we scanned will be either a 1 if its a wall/charger or a zero if its empty, and everywhere outside the reason we scanned is a 1. This to make sure the path doesn't take us through walls.
+%We set up the goal register which is just saying our goal is to get back
+%to the start
+GoalRegister=int8(chargingStations);
+
+
+%Connecting Distance just determines how far of a jump we can make on each
+%step which is always a 1, which connects us to 8 adjcent cells
+Connecting_Distance=1;
+
+%Calling ASTARPATH to generate the OptimalPath
+OptimalPath=[];
+OptimalPath=ASTARPATH(pos(1),pos(2),scanZone,GoalRegister,Connecting_Distance);
+
+%OptimalPath is gives you all the coordinates from start to goal in reverse order
+%Therefore when returning to base we can take the 2nd to last minus the
+%last one to get the delta x and delta y of the next step we need to make
+%inorder to get back to the charger on the very last move.
+if(length(OptimalPath)>step_lim-2-step_num)
+    directionMatrix=[7 8 9; 4 5 6; 1 2 3];
+    OptimalPath2=rot90(OptimalPath,2);
+        if(~isempty(OptimalPath))
+            delta=[OptimalPath2(2,1)-OptimalPath2(1,1),OptimalPath2(2,2)-OptimalPath2(1,2)];
+            decodeToDirection=delta+[2,2];
+            direction=directionMatrix(decodeToDirection(2),decodeToDirection(1));
+        else
+            direction=currentDirection;
+        end
+else
+    direction=currentDirection;
+end
 end
 
 function output=deadReckon(pos,direction)

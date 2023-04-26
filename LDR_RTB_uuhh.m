@@ -26,7 +26,7 @@ end
 pos=mem.pos;
 map=mem.map;
 LV=local_view;
-LV(isnan(LV))=UNEXPLORED;
+LV([1 end], [1 end])=UNEXPLORED;
 
 if step_num==0
     %set up map and pos on first step
@@ -44,6 +44,27 @@ if step_num==0
     %bottom, left, right, top
     slams={ones(1,29)*17,ones(25,1)*5,ones(25,1)*21,ones(1,29)*5};
 
+    %HEATMAP:
+    %
+    %All positive numbers:gradient to a charger
+    %Walls: -1
+    %Unexplored: -2
+%     heatmap=[ones(2,29)*WALL;  ones(19,2)*WALL, ones(19,25)*-2, ones(19,2)*WALL;  ones(2,29)*WALL];
+    
+
+
+    %We set up the goal register which is just saying our goal is to get back
+    %to the start
+    GoalRegister=int8(zeros(23,29));
+
+    %Find other goals
+    
+    startingChargerPos=[mod(find(LV==1),length(LV)),ceil(find(LV==1)/length(LV))];
+    startingChargerPos=startingChargerPos+[12-2,12-2];
+    GoalRegister(startingChargerPos(1)-1,startingChargerPos(2))=1;
+    GoalRegister(startingChargerPos(1)+1,startingChargerPos(2))=1;
+    GoalRegister(startingChargerPos(1),startingChargerPos(2)-1)=1;
+    GoalRegister(startingChargerPos(1),startingChargerPos(2)+1)=1;
     mapPointBlocks=zeros(23,29);
 
     %We set up the goal register which is just saying our goal is to get back
@@ -94,13 +115,15 @@ Connecting_Distance=1;
 
 %Calling ASTARPATH to generate the OptimalPath
 OptimalPath=[];
-if(step_num>0)&&sum(pos==[12,12])~=2
+if(step_num>0)&&~(GoalRegister(pos(2),pos(1)))
 OptimalPath=ASTARPATH(pos(1),pos(2),scanZone,GoalRegister,Connecting_Distance);
 end
 %OptimalPath is gives you all the coordinates from start to goal in reverse order
 %Therefore when returning to base we can take the 2nd to last minus the
 %last one to get the delta x and delta y of the next step we need to make
 %inorder to get back to the charger on the very last move.
+disp(length(OptimalPath)+1>100-step_num);
+if(length(OptimalPath)>100-step_num)
 
 if(length(OptimalPath)>99-step_num)
     directionMatrix=[7 8 9; 4 5 6; 1 2 3];
@@ -109,6 +132,12 @@ if(length(OptimalPath)>99-step_num)
     decodeToDirection=delta+[2,2];
     direction=directionMatrix(decodeToDirection(2),decodeToDirection(1));
 end
+
+
+if(step_num>=95)&&GoalRegister(pos(2),pos(1))
+    direction=5;
+end
+map=updateMap(pos,map,LV); %update map before you change position TO SEE MAP LOAD IN memorySpace THEN DO image((map(:,:)+1)*128)
 if(step_num>98)&&sum(pos==[12,12])==2
     direction=5;
 end
@@ -210,6 +239,9 @@ function output=updateMap(pos, map, LV)
     map([(pos(2)-2):(pos(2)+2)],[(pos(1)-2):(pos(1)+2)])=LV_new+temp;
     output=map;
 end
+
+%function updateGoalRegister()
+%end
 
 function output=updateSlams(pos,LV,slams) %do this before updating position
 %bottom, left, right, top

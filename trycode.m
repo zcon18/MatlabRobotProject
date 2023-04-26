@@ -18,6 +18,7 @@ if (step_num==0)
     pos=STARTING_POS;
     slams={ones(1,29)*17,ones(23,1)*5,ones(23,1)*21,ones(1,29)*5};
     direction=randi(4,1)*2;
+    disp("Starting: "+direction);
     [direction,directions]=calculate(pos,direction,map,optibox);
 end
 
@@ -43,12 +44,14 @@ function [output, directions]=navigate(pos, directions, LV, step, map, optibox)
     groups={SW; S; SE; W; [3 3]; E; NW; N; NE}; %These are the only block groups that the bot will ever look at, the index number of the block corresponds to if you placed a keypad on the 3x3 section around the bot in local view, this means that cell with a given index number will be in the direction number of the next step
     disp("Step: "+step)
     disp("Directions: "+directions);
-    if(step>directions)
-        [output,d]=calculate(pos, directions(step-1), map, optibox);
-        directions=[directions(1:step-1),d];
-    elseif sum(sum(groups{directions(step)},"omitnan")) >= 0 %Checks if the block it's heading towards is not a wall
-        output=directions(step);
-        directions=directions;
+    if sum(sum(groups{directions(step)},"omitnan")) >= 0 %Checks if the block it's heading towards is not a wall
+        if(directions(step+1)~=directions(step))
+            [output,d]=calculate(pos, directions(step), map, optibox);
+            directions=[directions(1:step),d]; %kill current line add new one
+        else
+            output=directions(step);
+            directions=directions;
+        end
     else %If it is a wall then select possible new directions based on the current direction
         [output,d]=calculate(pos, directions(step), map, optibox);
         directions=[directions(1:step),d]; %kill current line add new one
@@ -58,7 +61,7 @@ end
 function [output,newDirections]=calculate(pos, direction, map, optibox)
 %Left and right check
     if(direction==2)||(direction==8)
-        scoreGrid=zeros(23,29);
+        scoreGrid=zeros(23,29); %This is where all the point estimations go
         pointMap=(map==2); %UNEXPLORED
         walls=(map==-1)+(map==1); %WALL and CHARGING STATION
         for i=pos(1):-1:optibox.left
@@ -87,8 +90,6 @@ function [output,newDirections]=calculate(pos, direction, map, optibox)
                 pointMap3=pointMap2([j-2:pos(2)+2],[i-2:i+2]);
                 pointMap3([1 end],[1 end]); %remove corners
                 scoreGrid(j,i)=scoreGrid(j,i)+sum(sum(pointMap3));
-        %         pointMap4=pointMap2
-        %         pointMap4([topBound-2:pos(2)+2],[i-2:i+2])=0;
             end
             for j=pos(2):bottomBound
                 pointMap3=pointMap2([pos(2)-2:j+2],[i-2:i+2]);
@@ -138,25 +139,13 @@ function [output,newDirections]=calculate(pos, direction, map, optibox)
         delta=[y_max(1),x_max(1)]-[pos(2),pos(1)];
         disp(delta);
         disp(delta(1,2));
-        %We only care about the x-direction
-        if delta(1,2)>0
-            newDirections=ones(1,abs(delta(1,2)))*6;
-            output=newDirections(1);
-        end
-        if delta(1,2)<0
-            newDirections=ones(1,abs(delta(1,2)))*4;
-            output=newDirections(1);
-        end
-        if delta(1,2)==0
-            if delta(1,1)<0
-                newDirections=ones(1,abs(delta(1,1)))*8;
-                output=newDirections(1);
-            end
-            if delta(1,1)>0
-                newDirections=ones(1,abs(delta(1,1)))*2;
-                output=newDirections(1);
-            end
-        end
+        %We want to go left or right then up or down first
+        LRdirectionMatrix=[4 8 6; 4 5 6; 4 2 6];
+        direction1=LRdirectionMatrix(delta(1,2)/abs(delta(1,2))+3,delta(1,1)/abs(delta(1,1))+3); %We only care wether or not x is postive or negative
+        UPdirectionMatrix=[8 8 8; 4 5 6; 2 2 2];
+        direction2=UPdirectionMatrix(delta(1,2)/abs(delta(1,2))+3,delta(1,1)/abs(delta(1,1))+3)
+        newDirections=[direction1*abs(delta(1,1)),direction2*abs(delta(1,2))];
+        output=newDirections(1);
     end
     if(direction==4)||(direction==6)
         scoreGrid=zeros(23,29);
@@ -239,25 +228,13 @@ function [output,newDirections]=calculate(pos, direction, map, optibox)
         delta=[y_max(1),x_max(1)]-[pos(2),pos(1)];
         disp(delta);
         disp(delta(1,2));
-        %We only care about the x-direction
-        if delta(1,1)>0
-            newDirections=ones(1,abs(delta(1,1)))*2;
-            output=newDirections(1);
-        end
-        if delta(1,1)<0
-            newDirections=ones(1,abs(delta(1,1)))*8;
-            output=newDirections(1);
-        end
-        if delta(1,2)==0
-            if delta(1,2)<0
-                newDirections=ones(1,abs(delta(1,2)))*4;
-                output=newDirections(1);
-            end
-            if delta(1,2)>0
-                newDirections=ones(1,abs(delta(1,2)))*6;
-                output=newDirections(1);
-            end
-        end
+        %We want to go up or down first then left or right;
+        LRdirectionMatrix=[4 8 6; 4 5 6; 4 2 6];
+        UPdirectionMatrix=[8 8 8; 4 5 6; 2 2 2];
+        direction1=UPdirectionMatrix(delta(1,2)/abs(delta(1,2))+3,(delta(1,1)/abs(delta(1,1)))+3);
+        direction2=LRdirectionMatrix(delta(1,2)/abs(delta(1,2))+3,delta(1,1)/abs(delta(1,1))+3); %We only care wether or not x is postive or negative
+        newDirections=[direction1*abs(delta(1,1)),direction2*abs(delta(1,2))];
+        output=newDirections(1);
     end
 end
 
