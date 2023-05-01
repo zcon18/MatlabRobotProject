@@ -88,7 +88,7 @@ if(step_num>step_lim-3)&&(chargingStations1(pos1(2),pos1(1))==1)
 end
 if(isequal(pos1+moveArray{direction1},pos2))
     direction1=5;
-    disp("boink");
+    %disp("boink");
 end
 %END of path 1
 
@@ -124,8 +124,8 @@ if(step_num>step_lim-3)&&(chargingStations2(pos2(2),pos2(1))==1)
     direction2=5;
 end
 if(isequal(pos2+moveArray{direction2},newPos1)||isequal(pos2+moveArray{direction2},pos1))
-    disp("PING");
-    pause();
+    %disp("PING");
+    %pause();
     direction2=5;
 end
 %END of path 2
@@ -206,7 +206,7 @@ function output=find_permeable(direction, LV) %this function uses recursion to f
                 bounceDirection=[3,9];
             case 5 %just in case a 5 somehow is picked
                 bounceDirection=[1,2,3,4,6,7,8,9];
-                disp("what?");
+                %disp("what?");
             case 6
                 bounceDirection=[1,7];
             case 7
@@ -292,7 +292,7 @@ function output=deadReckon(pos,direction)
             pos_new=pos+[-1,0];
         case 5
             pos_new=pos+[0,0];
-            disp("what?");
+            %disp("what?");
         case 6
             pos_new=pos+[1,0];
         case 7
