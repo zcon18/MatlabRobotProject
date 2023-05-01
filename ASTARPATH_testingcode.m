@@ -49,6 +49,9 @@ else
     StartX=pos(1);
     StartY=pos(2);
 end
+figure(2);
+image(double(MAP)*256);
+figure(3);
 %Start Positions
 %Generating goal nodes, which is represented by a matrix. Several goals can be speciefied, in which case the pathfinder will find the closest goal. 
 %a cell with the value 1 represent a goal cell

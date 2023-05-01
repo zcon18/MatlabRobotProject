@@ -1,0 +1,512 @@
+%Author: Zack Weinstein
+%Theory: Break sections of FOV into groups (NE, N, NW, W, etc). Only pay 
+%attention to the group immediately in front of the bot on the next step.
+%If there is a wall in any of these spaces (which can be determined using
+%the sum command) mark this as impermeable and check a one of the 2 
+%adjacent directions to the opposite of the current direction. Keep
+%checking until you find a permeable direction.
+WALL=-1;
+SPACE=0;
+UNEXPLORED=2;
+ROBOT=5;
+STARTING_POS_1=[12,12]; 
+STARTING_POS_2=[13,13]; 
+
+%Grabs corresponding row of the local_view varible and turns it into 2 5x5
+LV1=reshape(local_view(1,:,:),5,5);
+LV1(3,3)=0; %I NEED TO CHECK IF THIS WILL MESS ANYTHING UP
+LV1=LV1.*(LV1~=5)+(LV1==5)*WALL;
+LV2=reshape(local_view(2,:,:),5,5);
+LV2(3,3)=0;
+LV2=LV2.*(LV2~=5)+(LV2==5)*WALL;
+moveArray={[-1,1],[0,1],[1,1],[-1,0],[0,0],[1,0],[-1,-1],[0,-1],[1,-1]};
+
+
+%Mem needs to be called in both branches
+%TODO: CHECK IF map and pos exsit within an existing memorySpace.mat file
+%or else code will break
+if isfile('memorySpace.mat') %There's a chance the file won't exist so we need to make it just in case
+    mem = matfile('memorySpace.mat','Writable',true); % Matfile makes it so we don't have to load a file in each time
+else
+    disp("memory space file does not exist, creating")
+    map=[ones(2,29)*WALL;  ones(19,2)*WALL, ones(19,25)*UNEXPLORED, ones(19,2)*WALL;  ones(2,29)*WALL];
+    save("memorySpace.mat",'map');
+    mem=matfile('memorySpace.mat','Writable',true);
+    mem.pos1=STARTING_POS_1;
+    mem.pos2=STARTING_POS_2;
+end
+
+pos1=mem.pos1;
+pos2=mem.pos2;
+map=mem.map;
+
+if step_num==0
+    %set up map and pos on first step
+    map=[ones(2,29)*WALL;  ones(19,2)*WALL, ones(19,25)*UNEXPLORED, ones(19,2)*WALL;  ones(2,29)*WALL];
+    updateMap(STARTING_POS_1, map, LV1);
+    updateMap(STARTING_POS_2, map,LV2);
+    pos1=STARTING_POS_1;
+    pos2=STARTING_POS_2;
+
+    i=5;
+    while i==5 %picks a random direction (can't be 5 because it won't go anywhere)
+        i=randi(9,1);
+    end
+    direction1=i;
+    direction2=10-direction1;
+
+    %build slams
+    %bottom, left, right, top
+    slams={ones(1,29)*17,ones(25,1)*5,ones(25,1)*21,ones(1,29)*5};
+
+    mapPointBlocks1=zeros(23,29);
+    mapPointBlocks2=zeros(23,29);
+
+    chargingStations1=zeros(23,29);
+    chargingStations1(12,12)=1;
+
+    chargingStations2=zeros(23,29);
+    chargingStations2(13,13)=1;
+end
+
+%finalize
+
+%Start of path 1
+direction1=find_permeable(direction1, LV1);
+
+if(sum(sum(mapPointBlocks1))>0)&&(mapPointBlocks1(pos1(2),pos1(1))~=1)
+    direction1=goToGreen(pos1,direction1,map,LV1,mapPointBlocks1,pos2);
+end
+
+if(step_num>0)&&(chargingStations1(pos1(2),pos1(1))~=1)
+    alteredMap=map+chargingStations2*WALL;
+    direction1=returnToBase(pos1,direction1,alteredMap,LV1, chargingStations1,step_num,step_lim);
+end
+
+if(step_num>step_lim-3)&&(chargingStations1(pos1(2),pos1(1))==1)
+    direction1=5;
+end
+if(isequal(pos1+moveArray{direction1},pos2))
+    direction1=5;
+    disp("boink");
+end
+%END of path 1
+
+
+LV2_N=LV2;
+LV2_NW=[pos2(2)-2,pos2(1)-2]; %Northwest corner of LV2
+mappedPos1=pos1-LV2_NW+[1,1];
+if(sum(mappedPos1<=[5,5])==2)&&(sum(mappedPos1>=[1,1])==2) %checks if the position is actually on LV2
+    LV2_N(mappedPos1(2),mappedPos1(1))=-1; %sets the position of LV2 to five to treat this as a wall block
+end
+mappedNewPos1=pos1+moveArray{direction1}-LV2_NW+[1,1]; %the new position bot 1 on LV2
+if(sum(mappedNewPos1<=[5,5])==2)&&(sum(mappedNewPos1>=[1,1])==2) %checks if the new position is actually on LV2
+    LV2_N(mappedNewPos1(2),mappedNewPos1(1))=-1; %sets the new position of LV2 to five to treat this as a wall block
+end
+newPos1=pos1+moveArray{direction1};
+
+
+%Start of path 2
+direction2=find_permeable(direction2, LV2_N);
+
+%change direction2 to green
+if(sum(sum(mapPointBlocks2))>0)&&(mapPointBlocks2(pos2(2),pos2(1))~=1)
+    direction2=goToGreen(pos2,direction2,map,LV2,mapPointBlocks2,newPos1);
+end
+
+if(step_num>0)&&(chargingStations2(pos2(2),pos2(1))~=1)
+    alteredMap=map+chargingStations1*-1;
+    [row1,col1]=find(chargingStations1);
+    direction2=returnToBase(pos2,direction2,alteredMap,LV2,chargingStations2,step_num,step_lim);
+end
+
+if(step_num>step_lim-3)&&(chargingStations2(pos2(2),pos2(1))==1)
+    direction2=5;
+end
+if(isequal(pos2+moveArray{direction2},newPos1)||isequal(pos2+moveArray{direction2},pos1))
+    disp("PING");
+    pause();
+    direction2=5;
+end
+%END of path 2
+
+map=updateMap(pos1,map,LV1); %update map before you change position TO SEE MAP LOAD IN memorySpace THEN DO image((map(:,:)+1)*128)
+map=updateMap(pos2,map,LV2);
+
+%Update Goal Register to find the nearest charging station
+[chargingStations1,chargingStations2]=updateGoalRegister(pos1,LV1,chargingStations1,chargingStations2);
+[chargingStations1,chargingStations2]=updateGoalRegister(pos2,LV2,chargingStations1,chargingStations2);
+
+
+%updating the map with all the points in it
+%local_view_1 but just the point blocks
+local_view_of_PBs1= (LV1==10);
+%saving
+mapPointBlocks1([pos1(2)-2],[pos1(1)-1:pos1(1)+1])=local_view_of_PBs1(1,[2:4]); %top
+mapPointBlocks1([pos1(2)-1:pos1(2)+1],[pos1(1)-2:pos1(1)+2])=local_view_of_PBs1([2:4],[1:5]); %mid
+mapPointBlocks1([pos1(2)+2],[pos1(1)-1:pos1(1)+1])=local_view_of_PBs1(5,[2:4]);
+
+%local_view_2 but with just the point blocks
+local_view_of_PBs2= (LV2==10);
+%saving
+mapPointBlocks2([pos2(2)-2],[pos2(1)-1:pos2(1)+1])=local_view_of_PBs2(1,[2:4]); %top
+mapPointBlocks2([pos2(2)-1:pos2(2)+1],[pos2(1)-2:pos2(1)+2])=local_view_of_PBs2([2:4],[1:5]); %mid
+mapPointBlocks2([pos2(2)+2],[pos2(1)-1:pos2(1)+1])=local_view_of_PBs2(5,[2:4]);
+
+slams=updateSlams(pos1,LV1,slams);
+if(~warn_msg(1))
+pos1=deadReckon(pos1,direction1);
+end
+if(~warn_msg(2))
+pos2=deadReckon(pos2,direction2);
+end
+
+%save
+mem.map=map;
+mem.pos1=pos1;
+mem.pos2=pos2;
+command=[direction1,direction2];
+
+mem.slams=slams;
+
+
+% Functions
+
+function output=find_permeable(direction, LV) %this function uses recursion to figure out if the bot can pass in the direction it's going on to the next step. if it can then it continues in the same direction, if not it picks from the 2 directions adjacent to it on the opposite side
+    % FOV Groups
+    LV=LV.*(LV~=1)+(LV==1)*-1;
+    NE=LV(2,4);
+    N =LV([1 2],3);
+    NW=LV(2,2);
+    W = LV(3,[1 2]);
+    SW=LV(4,2);
+    S = LV([4 5],3);
+    SE=LV(4,4);
+    E = LV(3,[4 5]);
+    groups={SW; S; SE; W; [3 3]; E; NW; N; NE}; %These are the only block groups that the bot will ever look at, the index number of the block corresponds to if you placed a keypad on the 3x3 section around the bot in local view, this means that cell with a given index number will be in the direction number of the next step
+    if sum(sum(groups{direction},"omitnan")) >= 0 %Checks if the block it's heading towards is not a wall
+        if(direction==5) %This is here because if a bot is ever given a 5 it will never repick because the block its on will never have a wall on it, in a way its the prefect choice
+            i=5;
+            while i==5
+                i=randi(9);
+            end
+            direction=i;
+            find_permeable(direction,LV);
+        end
+        output=direction;
+    else %If it is a wall then select possible new directions based on the current direction
+        switch direction
+            case 1
+                bounceDirection=[6,8];
+            case 2
+                bounceDirection=[7,9];
+            case 3
+                bounceDirection=[4,8];
+            case 4
+                bounceDirection=[3,9];
+            case 5 %just in case a 5 somehow is picked
+                bounceDirection=[1,2,3,4,6,7,8,9];
+                disp("what?");
+            case 6
+                bounceDirection=[1,7];
+            case 7
+                bounceDirection=[2,6];
+            case 8
+                bounceDirection=[1,3];
+            case 9
+                bounceDirection=[2,4];
+        end
+        direction=bounceDirection(randi(length(bounceDirection),1));
+        output=find_permeable(direction, LV); %then it runs the function again new direction it generated, to check if it can pass through the block in its new direction.
+    end
+end
+
+function direction=goToGreen(pos, currentDirection,map,LV,mapPointBlocks,avoidPos)
+    scanZone=int8((map~=0).*(map~=10));
+    scanZone(avoidPos(2),avoidPos(1))=1;
+    GoalRegister=int8(zeros(23,29));
+    GoalRegister=GoalRegister+int8(mapPointBlocks);
+    Connecting_Distance=1;
+    OptimalPath=[];
+    OptimalPath=ASTARPATH(pos(1),pos(2),scanZone,GoalRegister,Connecting_Distance);
+    local_view_of_PBs1=(LV==10);
+    if(sum(sum(OptimalPath~=inf))>0)
+        directionMatrix=[7 8 9; 4 5 6; 1 2 3];
+        OptimalPath2=rot90(OptimalPath,2);
+        delta=[OptimalPath2(2,1)-OptimalPath2(1,1),OptimalPath2(2,2)-OptimalPath2(1,2)];
+        decodeToDirection=delta+[2,2];
+        direction=directionMatrix(decodeToDirection(2),decodeToDirection(1));
+    else
+        direction=currentDirection;
+    end
+end
+
+function direction=returnToBase(pos,currentDirection,map,LV, chargingStations,step_num,step_lim) %cant call when on step zero or on back on starting block %if we are at the charging postion near the end don't move
+%Return to base will be determined by running the A* Algorthim on every
+%step until length of the path is equaled to the steps remaining minus 1
+%In this version of the algorthim path through blocks are zeros and
+%non-pass through blocks are ones.
+%The input matrixies must have int 8 entries for proformance reasons
+scanZone=int8((map~=0).*(map~=10)); %every where inside the region we scanned will be either a 1 if its a wall/charger or a zero if its empty, and everywhere outside the reason we scanned is a 1. This to make sure the path doesn't take us through walls.
+%We set up the goal register which is just saying our goal is to get back
+%to the start
+GoalRegister=int8(chargingStations);
+
+
+%Connecting Distance just determines how far of a jump we can make on each
+%step which is always a 1, which connects us to 8 adjcent cells
+Connecting_Distance=1;
+
+%Calling ASTARPATH to generate the OptimalPath
+OptimalPath=[];
+OptimalPath=ASTARPATH(pos(1),pos(2),scanZone,GoalRegister,Connecting_Distance);
+
+%OptimalPath is gives you all the coordinates from start to goal in reverse order
+%Therefore when returning to base we can take the 2nd to last minus the
+%last one to get the delta x and delta y of the next step we need to make
+%inorder to get back to the charger on the very last move.
+if(length(OptimalPath)>step_lim-2-step_num)
+    directionMatrix=[7 8 9; 4 5 6; 1 2 3];
+    OptimalPath2=rot90(OptimalPath,2);
+        if(~isempty(OptimalPath))
+            delta=[OptimalPath2(2,1)-OptimalPath2(1,1),OptimalPath2(2,2)-OptimalPath2(1,2)];
+            decodeToDirection=delta+[2,2];
+            direction=directionMatrix(decodeToDirection(2),decodeToDirection(1));
+        else
+            direction=currentDirection;
+        end
+else
+    direction=currentDirection;
+end
+end
+
+function output=deadReckon(pos,direction)
+    switch direction %even though 9 goes further upwards a greater y vaule correspondes to being lower on the map so 7 to 9 have negative vaules attached
+        case 1
+            pos_new=pos+[-1,1];
+        case 2
+            pos_new=pos+[0,1];
+        case 3
+            pos_new=pos+[1,1];
+        case 4
+            pos_new=pos+[-1,0];
+        case 5
+            pos_new=pos+[0,0];
+            disp("what?");
+        case 6
+            pos_new=pos+[1,0];
+        case 7
+            pos_new=pos+[-1,-1];
+        case 8
+            pos_new=pos+[0,-1];
+        case 9
+            pos_new=pos+[1,-1];
+    end
+    output=pos_new;
+end
+
+function output=updateMap(pos, map, LV)
+    LV_new=LV;
+    LV_new([1 end], [1 end])=0;
+    temp=[map(pos(2)-2,pos(1)-2) 0 0 0 map(pos(2)-2,pos(1)+2); 0 0 0 0 0; 0 0 0 0 0; 0 0 0 0 0; map(pos(2)+2,pos(1)-2) 0 0 0 map(pos(2)+2,pos(1)+2)]; %A greater Y corresponds to a lower height therefore the NE and NW corners have lower Y values than SE and SW, also the Y value goes first in arrays
+    map([(pos(2)-2):(pos(2)+2)],[(pos(1)-2):(pos(1)+2)])=LV_new+temp;
+    output=map;
+end
+
+function [outputWE,outputNS]=updateGoalRegister(pos,LV, GR1, GR2) %this updates the 2 different goal registers to where the charging stations are, WE go to bot 1, NS go to bot 2. Works under the assumption that there are no walls adjacent to a charging block
+    chargingBlockMap = [0 0 0 0 0 0 0; zeros(5, 1) (LV==1) zeros(5,1); 0 0 0 0 0 0 0];
+    BigGR1=zeros(size(GR1,1)+2,size(GR1,2)+2);
+    BigGR1([2:end-1],[2:end-1])=GR1;
+    BigGR2=zeros(size(GR2,1)+2,size(GR2,2)+2);
+    BigGR2([2:end-1],[2:end-1])=GR2;
+    [row,col]=find(chargingBlockMap);
+    LV_CS1=zeros(7,7);
+    LV_CS2=zeros(7,7);
+    %fit it in the 7x7 matrix
+    if(~isempty(row))
+        for i = 1:length(row)
+            %W and E go to bot 1
+            LV_CS1(row,col-1)=1;
+            LV_CS1(row,col+1)=1;
+            %N and S go to bot 2
+            LV_CS2(row-1,col)=1;
+            LV_CS2(row+1,col)=1;
+        end
+    end
+    %update the GoalRegisters
+    pos=pos+[1,1];
+    BigGR1([pos(2)-3:pos(2)+3],[pos(1)-3:pos(1)+3])=double(logical(BigGR1([pos(2)-3:pos(2)+3],[pos(1)-3:pos(1)+3])+LV_CS1)); %we us an OR gate here because we don't want it to overwrite old areas with charging blocks it can no longer see
+    BigGR2([pos(2)-3:pos(2)+3],[pos(1)-3:pos(1)+3])=double(logical(BigGR2([pos(2)-3:pos(2)+3],[pos(1)-3:pos(1)+3])+LV_CS2));
+    GR1=BigGR1([2:end-1],[2:end-1]);
+    GR2=BigGR2([2:end-1],[2:end-1]);
+    pos=pos+[-1,-1];
+    outputWE=double(GR1);
+    outputNS=double(GR2);
+
+end
+
+function output=updateSlams(pos,LV,slams) %do this before updating position
+%bottom, left, right, top
+%everything is in the reference frame of LV
+    bottom=slams{1}((pos(1)-2):(pos(1)+2)); %how far down you can go looks for the least y-valued one
+    left=slams{2}((pos(2)-2):(pos(2)+2)); %how far left you can go, looks for the most x-valued one
+    right=slams{3}((pos(2)-2):(pos(2)+2)); %how for right you can go, looks for the least x-valued one
+    top=slams{4}((pos(1)-2):(pos(1)+2)); %how far up you can go, looks for the most y-valued one
+    %keep in mind that the top left cor of LV is at
+    %(Y,X):(pos(2)-2,pos(1)-2)
+    LV([1 end], [1 end])=0; %by setting its corners to zero it means we just wont update them
+    walls=(LV==-1)+(LV==1);
+    for i = 1:length(LV) %rows
+        for j = 1:length(LV(i,:)) %collumns
+            if(walls(i,j)==1)
+                y=pos(2)-3+i;
+                x=pos(1)-3+j;
+                if (y<bottom(j))
+                    bottom(j)=y; %get the correct cell, check if its less than the current valued one, if so replace it
+                end
+                if(x>left(i))
+                    left(i)=x;
+                end
+                if (x<right(i))
+                    right(i)=x;
+                end
+                if (y>top(j))
+                    top(j)=y;
+                end
+            end
+        end
+    end
+    if(sum(left==0)>0)
+        disp("ZERO FOUND");
+    end
+    slams{1}((pos(1)-2):(pos(1)+2))=bottom;
+    slams{2}((pos(2)-2):(pos(2)+2))=left;
+    slams{3}((pos(2)-2):(pos(2)+2))=right;
+    slams{4}((pos(1)-2):(pos(1)+2))=top;
+    output=slams;
+end
+
+function OptimalPath=ASTARPATH(StartX,StartY,MAP,GoalRegister,Connecting_Distance)
+%Version 1.0
+% By Einar Ueland 2nd of May, 2016
+%FINDING ASTAR PATH IN AN OCCUPANCY GRID
+%nNeighboor=3;
+% Preallocation of Matrices
+[Height,Width]=size(MAP); %Height and width of matrix
+GScore=zeros(Height,Width);           %Matrix keeping track of G-scores 
+FScore=single(inf(Height,Width));     %Matrix keeping track of F-scores (only open list) 
+Hn=single(zeros(Height,Width));       %Heuristic matrix
+OpenMAT=int8(zeros(Height,Width));    %Matrix keeping of open grid cells
+ClosedMAT=int8(zeros(Height,Width));  %Matrix keeping track of closed grid cells
+ClosedMAT(MAP==1)=1;                  %Adding object-cells to closed matrix
+ParentX=int16(zeros(Height,Width));   %Matrix keeping track of X position of parent
+ParentY=int16(zeros(Height,Width));   %Matrix keeping track of Y position of parent
+%%% Setting up matrices representing neighboors to be investigated
+NeighboorCheck=ones(2*Connecting_Distance+1);
+Dummy=2*Connecting_Distance+2;
+Mid=Connecting_Distance+1;
+for i=1:Connecting_Distance-1
+NeighboorCheck(i,i)=0;
+NeighboorCheck(Dummy-i,i)=0;
+NeighboorCheck(i,Dummy-i)=0;
+NeighboorCheck(Dummy-i,Dummy-i)=0;
+NeighboorCheck(Mid,i)=0;
+NeighboorCheck(Mid,Dummy-i)=0;
+NeighboorCheck(i,Mid)=0;
+NeighboorCheck(Dummy-i,Mid)=0;
+end
+NeighboorCheck(Mid,Mid)=0;
+[row, col]=find(NeighboorCheck==1);
+Neighboors=[row col]-(Connecting_Distance+1);
+N_Neighboors=size(col,1);
+%%% End of setting up matrices representing neighboors to be investigated
+%%%%%%%%% Creating Heuristic-matrix based on distance to nearest  goal node
+[col, row]=find(GoalRegister==1);
+RegisteredGoals=[row col];
+Nodesfound=size(RegisteredGoals,1);
+for k=1:size(GoalRegister,1)
+    for j=1:size(GoalRegister,2)
+        if MAP(k,j)==0
+            Mat=RegisteredGoals-(repmat([j k],(Nodesfound),1));
+            Distance=(min(sqrt(sum(abs(Mat).^2,2))));
+            Hn(k,j)=Distance;
+        end
+    end
+end
+%End of creating Heuristic-matrix. 
+%Note: If Hn values is set to zero the method will reduce to the Dijkstras method.
+%Initializign start node with FValue and opening first node.
+FScore(StartY,StartX)=Hn(StartY,StartX);         
+OpenMAT(StartY,StartX)=1;   
+while 1==1 %Code will break when path found or when no path exist
+    MINopenFSCORE=min(min(FScore));
+    if MINopenFSCORE==inf;
+    %Failuere!
+    OptimalPath=[inf];
+    RECONSTRUCTPATH=0;
+     break
+    end
+    [CurrentY,CurrentX]=find(FScore==MINopenFSCORE);
+    CurrentY=CurrentY(1);
+    CurrentX=CurrentX(1);
+    if GoalRegister(CurrentY,CurrentX)==1
+    %GOAL!!
+        RECONSTRUCTPATH=1;
+        break
+    end
+    
+  %Remobing node from OpenList to ClosedList  
+    OpenMAT(CurrentY,CurrentX)=0;
+    FScore(CurrentY,CurrentX)=inf;
+    ClosedMAT(CurrentY,CurrentX)=1;
+    for p=1:N_Neighboors
+        i=Neighboors(p,1); %Y
+        j=Neighboors(p,2); %X
+        if CurrentY+i<1||CurrentY+i>Height||CurrentX+j<1||CurrentX+j>Width
+            continue
+        end
+        Flag=1;
+        if(ClosedMAT(CurrentY+i,CurrentX+j)==0) %Neiboor is open;
+            if (abs(i)>1||abs(j)>1);   
+                % Need to check that the path does not pass an object
+                JumpCells=2*max(abs(i),abs(j))-1;
+                for K=1:JumpCells;
+                    YPOS=round(K*i/JumpCells);
+                    XPOS=round(K*j/JumpCells);
+            
+                    if (MAP(CurrentY+YPOS,CurrentX+XPOS)==1)
+                        Flag=0;
+                    end
+                end
+            end
+             %End of  checking that the path does not pass an object
+            if Flag==1;           
+                tentative_gScore = GScore(CurrentY,CurrentX) + sqrt(i^2+j^2);
+                if OpenMAT(CurrentY+i,CurrentX+j)==0
+                    OpenMAT(CurrentY+i,CurrentX+j)=1;                    
+                elseif tentative_gScore >= GScore(CurrentY+i,CurrentX+j)
+                    continue
+                end
+                ParentX(CurrentY+i,CurrentX+j)=CurrentX;
+                ParentY(CurrentY+i,CurrentX+j)=CurrentY;
+                GScore(CurrentY+i,CurrentX+j)=tentative_gScore;
+                FScore(CurrentY+i,CurrentX+j)= tentative_gScore+Hn(CurrentY+i,CurrentX+j);
+            end
+        end
+    end
+end
+k=2;
+if RECONSTRUCTPATH
+    OptimalPath(1,:)=[CurrentY CurrentX];
+    while RECONSTRUCTPATH
+        CurrentXDummy=ParentX(CurrentY,CurrentX);
+        CurrentY=ParentY(CurrentY,CurrentX);
+        CurrentX=CurrentXDummy;
+        OptimalPath(k,:)=[CurrentY CurrentX];
+        k=k+1;
+        if (((CurrentX== StartX)) &&(CurrentY==StartY))
+            break
+        end
+    end
+end
+end
